@@ -9,7 +9,6 @@ tmp/*.fasta
 */tmp/*.txt
 *.csv
 
-target_seqs/**/*.fasta
 results_*/
 
 **/__pycache__
