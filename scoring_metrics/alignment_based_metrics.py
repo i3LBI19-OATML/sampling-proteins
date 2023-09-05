@@ -27,7 +27,7 @@ def ESM_MSA(target_seqs_file, reference_seqs_file, results):
     except subprocess.CalledProcessError as e:
       print("ggsearch36 found no hits, stderr and stdout below:")
       print('stderr: ', e.stderr.decode('utf-8'))
-      print('stdout: 'e.stdout.decode('utf-8'))
+      print('stdout: ', e.stdout.decode('utf-8'))
       raise e
     # print(proc.stdout)
     # print(proc.stderr)

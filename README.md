@@ -7,13 +7,14 @@ Consists of 2 parts:
 ## Protein Generation (powered by Tranception)
 
 Generation Steps:
-1. Scores the sequence using Tranception
-2. Generate possible mutations
-3. Sample mutations
-4. Mutate original sequence
+1. Score possible mutated/extended sequence using Tranception
+2. Generate mutations key
+3. Sample mutations/extension
+4. Mutate/extend original sequence with key
 5. Repeat (1-4) until desired parameters
+*Mutate for MLDE and extend for AR
 
-### Single-Mutant Usage
+### Single-Mutant Usage (MLDE)
 ```
 python generator.py \
     --sequence [mdh_esm, mdh_esm_2, avGFP] \
@@ -26,7 +27,7 @@ python generator.py \
     --output_name folder_within_generated_sequence/sub_folder/fasta_file_name
 ```
 
-### Multi-Mutant Usage
+### Multi-Mutant Usage (MLDE)
 ```
 python generator.py \
     --sequence [mdh_esm, mdh_esm_2, avGFP] \
