@@ -137,6 +137,7 @@ try:
                                 results=results,
                                 gap_open=sub_gap_open,
                                 gap_extend=sub_gap_extend,)
+  identity_score = True
 except:
   identity_score = False
 
