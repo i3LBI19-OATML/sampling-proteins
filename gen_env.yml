@@ -1,0 +1,17 @@
+name: protein_generator
+channels:
+  - conda-forge
+  - anaconda
+dependencies:
+  - python=3.8
+  - pip
+  - cudatoolkit~=11.7
+  - cudnn~=8.4.1
+  - seaborn~=0.11.2
+  - matplotlib=3.2.2
+  - pytorch=1.13.1
+  - transformers=4.17
+  - biopython~=1.78
+  - datasets=1.18.3
+  - pip:
+      - -e ./protein_bert/

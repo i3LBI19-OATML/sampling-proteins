@@ -1,0 +1,13 @@
+**/.DS_Store
+
+*.pyc
+__pycache__
+src/pgen.egg-info/
+*/tmp/*.fasta
+tmp/*.fasta
+
+*/tmp/*.txt
+*.csv
+
+target_seqs/**/*.fasta
+results_*/
