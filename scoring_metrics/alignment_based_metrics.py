@@ -23,11 +23,10 @@ def ESM_MSA(target_seqs_file, reference_seqs_file, results):
   with tempfile.TemporaryDirectory() as output_dir:
     outfile = output_dir + "/esm_results.tsv"
     try:
-      proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm_msa.py"), "-i", target_seqs_file, "-o", outfile, "--reference_msa", reference_seqs_file, "--subset_strategy", "top_hits", "--alignment_size", "31", "--count_gaps", "--mask_distance", "6", "--device", "gpu"], check=True, capture_output=True) # stdout=subprocess.PIPE, stderr=subprocess.PIPE
+      proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm_msa.py"), "-i", target_seqs_file, "-o", outfile, "--reference_msa", reference_seqs_file, "--subset_strategy", "top_hits", "--alignment_size", "31", "--count_gaps", "--mask_distance", "6", "--device", "gpu"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) # stdout=subprocess.PIPE, stderr=subprocess.PIPE
     except subprocess.CalledProcessError as e:
-      print("ggsearch36 found no hits, stderr and stdout below:")
-      print('stderr: ', e.stderr.decode('utf-8'))
-      print('stdout: ', e.stdout.decode('utf-8'))
+      print(e.stderr.decode('utf-8'))
+      print(e.stdout.decode('utf-8'))
       raise e
     # print(proc.stdout)
     # print(proc.stderr)
@@ -42,15 +41,18 @@ def substitution_score(target_seqs_file, reference_seqs_file, substitution_matri
   assert substitution_matrix in ["BLOSUM62", "PFASUM15"], "substitution_matrix must be 'BLOSUM62' or 'PFASUM15'"
   search_results_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"tmp/ggsearch_results_{substitution_matrix}.txt")
   substitution_matrix_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f'tmp/{substitution_matrix}.mat')
+  # print("Matrix file: ", substitution_matrix_file)
+  ggsearch_path = str(os.path.join(os.path.dirname(os.path.realpath(__file__)), "fasta3/ggsearch36"))
   
   with open(search_results_file,"w") as fh:
     try:
-      proc = subprocess.run(['ggsearch36', '-f', str(gap_open), '-g', str(gap_extend), '-s', substitution_matrix_file, '-b,' '1', target_seqs_file, reference_seqs_file], check=True, capture_output=True) # stdout=subprocess.PIPE, stderr=subprocess.PIPE
+      proc = subprocess.run([ggsearch_path, '-f', str(gap_open), '-g', str(gap_extend), '-s', substitution_matrix_file, '-b,' '1', target_seqs_file, reference_seqs_file], stdout=subprocess.PIPE, check=True, stderr=subprocess.PIPE)
+      print(proc.stdout.decode('utf-8'), file=fh)
     except subprocess.CalledProcessError as e:
       print(e.stderr.decode('utf-8'))
       print(e.stdout.decode('utf-8'))
       raise e
-    # print(proc.stdout.decode('utf-8'), file=fh)
+
   df = pd.read_csv(substitution_matrix_file, delimiter=r"\s+")
   blosum62 = {}
   for aa1 in df.columns:

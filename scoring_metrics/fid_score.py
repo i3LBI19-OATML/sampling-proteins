@@ -52,9 +52,12 @@ def get_ESM1v_predictions(target_files, device = 'cuda:0'):
     for targets_fasta in target_files:
         with tempfile.TemporaryDirectory() as output_dir:
             outfile = output_dir + "/esm_results.tsv"
-            proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm.py"), "-i", targets_fasta, "-o", outfile, "--model", "esm1v", "--masking_off", "--score_name", "score", "--device", "gpu"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-            # print(proc.stdout)
-            # print(proc.stderr)
+            try:
+                proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm.py"), "-i", targets_fasta, "-o", outfile, "--model", "esm1v", "--masking_off", "--score_name", "score", "--device", "gpu"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            except subprocess.CalledProcessError as e:
+                print(e.stdout)
+                print(e.stderr)
+                raise e
             df = pd.read_table(outfile)
             print("done")
             for i, row in df.iterrows():

@@ -129,17 +129,17 @@ else:
   fretchet_score = None
 
 ab_metrics.ESM_MSA(target_seqs_file, reference_seqs_file, results)
-try:
-  ab_metrics.substitution_score(target_seqs_file, reference_seqs_file,
-                                substitution_matrix=sub_matrix, 
-                                Substitution_matrix_score_mean_of_mutated_positions=score_mean, 
-                                Identity_to_closest_reference=identity,
-                                results=results,
-                                gap_open=sub_gap_open,
-                                gap_extend=sub_gap_extend,)
-  identity_score = True
-except:
-  identity_score = False
+# try:
+ab_metrics.substitution_score(target_seqs_file, reference_seqs_file,
+                              substitution_matrix=sub_matrix, 
+                              Substitution_matrix_score_mean_of_mutated_positions=score_mean, 
+                              Identity_to_closest_reference=identity,
+                              results=results,
+                              gap_open=sub_gap_open,
+                              gap_extend=sub_gap_extend,)
+#   identity_score = True
+# except:
+#   identity_score = False
 
 if args.use_evmutation:
   ab_metrics.EVmutation(target_files=target_files, orig_seq=args.orig_seq.upper(), results=results, model_params=args.model_params)
@@ -168,8 +168,8 @@ if args.use_tranception:
 # Download results
 df = pd.DataFrame.from_dict(results, orient="index")
 df["FID"] = fretchet_score
-if not identity_score:
-  df['Identity'] = None
+# if not identity_score:
+#   df['Identity'] = None
 
 if score_structure:
   save_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "{}.csv".format(args.output_name))
