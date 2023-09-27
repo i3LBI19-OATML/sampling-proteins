@@ -1,0 +1,29 @@
+name: fold_env
+channels:
+  - conda-forge
+  - anaconda
+  - bioconda
+dependencies:
+  - python=3.8
+  - pip
+  - cudatoolkit~=11.7
+  - cudnn~=8.4.1
+  - pytorch=1.13.1
+  - aria2
+  - iminuit=1.5.4
+  - jax
+  - matplotlib
+  - omegaconf
+  - pytorch-lightning
+  - biopython=1.81
+  - ml-collections
+  - einops
+  - py3dmol
+  - pandas
+  - dm-tree
+  - pip:
+      - git+https://github.com/NVIDIA/dllogger.git
+      - git+https://github.com/aqlaboratory/openfold.git@6908936b68ae89f67755240e2f588c09ec31d4c8
+      - git+https://github.com/sokrypton/esm.git
+      - tmscoring
+      - -e .

@@ -24,3 +24,6 @@ output_scores.csv
 
 **/protein_bert.egg-info
 **/original_weights
+
+**/*.pdb
+**/*.pae.txt
