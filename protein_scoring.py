@@ -5,6 +5,7 @@ from pgen.utils import parse_fasta
 import pandas as pd
 import os
 import argparse
+from random import randint
 
 from scoring_metrics import structure_metrics as st_metrics
 from scoring_metrics import single_sequence_metrics as ss_metrics
@@ -108,23 +109,25 @@ identity = args.remove_identity
 sub_gap_open = args.sub_gap_open
 sub_gap_extend = args.sub_gap_extend
 
+rand_id = randint(10000, 99999) # Necessary for parallelization
+
 #concatenate reference sequences
 # Reference sequences
-reference_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "scoring_metrics/tmp/reference_seqs.fasta")
+reference_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/reference_seqs_{rand_id}.fasta")
 with open(reference_seqs_file,"w") as fh:
   for reference_fasta in reference_files:
     for name, seq in zip(*parse_fasta(reference_fasta, return_names=True, clean="unalign")):
       print(f">{name}\n{seq}", file=fh)
 
 # Target sequences
-target_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "scoring_metrics/tmp/target_seqs.fasta")
+target_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/target_seqs_{rand_id}.fasta")
 with open(target_seqs_file,"w") as fh:
   for target_fasta in target_files:
     for name, seq in zip(*parse_fasta(target_fasta, return_names=True, clean="unalign")):
       print(f">{name}\n{seq}", file=fh)
 
 if not args.skip_FID:
-  fretchet_score = fid.calculate_fid_given_paths(target_files, reference_files, device)
+  fretchet_score = fid.calculate_fid_given_paths(target_seqs_file, reference_seqs_file, device)
 else:
   fretchet_score = None
 
@@ -146,11 +149,6 @@ if args.use_evmutation:
 
 # Single sequence metrics
 # ESM-1v, ESM-1v-mask6, CARP-640m-logp, Repeat-1, Repeat-2, Repeat-3, Repeat-4, Tranception
-target_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "scoring_metrics/tmp/target_seqs.fasta")
-with open(target_seqs_file,"w") as fh:
-  for target_fasta in target_files:
-    for name, seq in zip(*parse_fasta(target_fasta, return_names=True, clean="unalign")):
-      print(f">{name}\n{seq}", file=fh)
 
 repeat_score = dict()
 repeat_score['repeat_1'] = args.remove_repeat_score_1
@@ -170,6 +168,10 @@ df = pd.DataFrame.from_dict(results, orient="index")
 df["FID"] = fretchet_score
 # if not identity_score:
 #   df['Identity'] = None
+
+# delete temporary files
+os.remove(reference_seqs_file)
+os.remove(target_seqs_file)
 
 if score_structure:
   save_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "{}.csv".format(args.output_name))

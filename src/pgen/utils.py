@@ -152,7 +152,7 @@ def parse_fasta(filename, return_names=False, clean=None, full_name=False):
         for i in range(len(out_seqs)):
             out_seqs[i] = remove_insertions(out_seqs[i].upper())
     elif clean == 'unalign':
-        deletekeys = {'*': None, ".": None, "-": None}
+        deletekeys = {'*': None, ".": None, "-": None, "X": None}
         
         translation = str.maketrans(deletekeys)
         remove_insertions = lambda x: x.translate(translation)

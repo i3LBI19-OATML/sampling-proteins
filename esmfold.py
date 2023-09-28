@@ -140,7 +140,7 @@ for _, row in data_df.iterrows():
   # TM Score
   reference_pdb = args.reference_pdb
   pdb_file = f"{prefix}.pdb"
-  tmscore = tmscoring.get_tm(reference_pdb, pdb_file) * 100
+  tmscore = tmscoring.get_tm(reference_pdb, pdb_file)
   tm_list.append(tmscore)
 
   print(f'ptm: {ptm:.3f} plddt: {plddt:.3f} tmscore: {tmscore:.3f}')

@@ -12,7 +12,7 @@ POSITIONAL_SCORE_SEP=";"
 
 model_map = {"esm1b":models.ESM1b, "esm6":models.ESM6, "esm12":models.ESM12, "esm34":models.ESM34, "esm1v":models.ESM1v}
 
-def main(input_h, output_h, masking_off, device, model, batch_size, mask_distance, csv, score_name, positionwise=None):
+def main(input_h, output_h, masking_off, device, model, batch_size, mask_distance, csv, score_name, positionwise=None, use_repr=False):
     positionwise_h = None
     if positionwise is not None:
         positionwise_h = open(positionwise,"w")
@@ -41,7 +41,7 @@ def main(input_h, output_h, masking_off, device, model, batch_size, mask_distanc
         tmp_name_list.append(name)
         if len(tmp_seq_list) == batch_size or i+1 == len(in_seqs):
             #TODO: batching is a little weird still because it used to be solely based on len(tmp_seq_list), but now batch size is independent of len(tmp_seq_list)
-            scores_iter = sampler.log_likelihood_batch(tmp_seq_list, with_masking=not masking_off, mask_distance=mask_distance,batch_size=batch_size)
+            scores_iter = sampler.log_likelihood_batch(tmp_seq_list, with_masking=not masking_off, mask_distance=mask_distance,batch_size=batch_size, use_repr=use_repr)
             for j, (score, positional_scores) in enumerate(scores_iter):
                 print(f"{tmp_name_list[j]}{sep}{score}", file=output_h)
                 if positionwise_h is not None:
@@ -67,6 +67,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", type=str, default=None, help="")
     parser.add_argument("-i", default=None, help="A fasta file with sequences to calculate log likelihood for. Any gaps or stop codons will be removed before running the ")
     parser.add_argument("--batch_size", default=1, help="How many sequences to batch together.")
+    parser.add_argument("--use_repr", action="store_true", default=False, help="If set, then the output will be logits instead of log likelihoods.")
     parser.add_argument("--device", type=str, default="cpu", choices={"cpu","gpu"}, help="cpu or gpu")
     parser.add_argument("--masking_off", action="store_true", default=False, help="If set, no masking is done.")
     parser.add_argument("--mask_distance",  type=int, default=None, help="If set, then multiple positions will be masked at a time, with (mask_distance - 1) non-masked positions between each masked position. This will make the likelihood calculations faster. Default: mask positions one at a time.")
@@ -78,6 +79,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.i is not None:
+        print(f"Reading input from {args.i}")
         input_handle=open(args.i, "r")
     else:
         input_handle = sys.stdin
@@ -96,7 +98,7 @@ if __name__ == "__main__":
     if args.masking_off and args.mask_distance is not None:
         raise ValueError(f"--masking_off and --mask_distance are both set, that doesn't make sense.")
 
-    main(input_handle, output_handle, args.masking_off, args.device, args.model, args.batch_size, mask_distance, args.csv, args.score_name, args.positionwise)
+    main(input_handle, output_handle, args.masking_off, args.device, args.model, args.batch_size, mask_distance, args.csv, args.score_name, args.positionwise, args.use_repr)
 
     if args.i is not None:
         input_handle.close()

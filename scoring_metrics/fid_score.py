@@ -49,11 +49,15 @@ def get_ESM1v_predictions(target_files, device = 'cuda:0'):
     pred_arr = []
     if device=='cuda:0':
         torch.cuda.empty_cache()
-    for targets_fasta in target_files:
+    # print(f'target_files:{target_files}')
+    for targets_fasta in [target_files]:
+        # print(f'target_fasta:{targets_fasta}')
         with tempfile.TemporaryDirectory() as output_dir:
             outfile = output_dir + "/esm_results.tsv"
             try:
-                proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm.py"), "-i", targets_fasta, "-o", outfile, "--model", "esm1v", "--masking_off", "--score_name", "score", "--device", "gpu"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm.py"), "-i", targets_fasta, "-o", outfile, "--model", "esm1v", "--masking_off", "--score_name", "score", "--device", "gpu", "--use_repr"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                # print(proc.stdout)
+                # print(proc.stderr)
             except subprocess.CalledProcessError as e:
                 print(e.stdout)
                 print(e.stderr)
@@ -157,7 +161,7 @@ def compute_statistics_of_path(path, device, num_workers=8):
 
 def calculate_fid_given_paths(target_files, reference_files, device, num_workers=8):
     """Calculates the FID of two paths"""
-
+    # print(f'target_files:{target_files}, reference_files:{reference_files}')
     m1, s1 = compute_statistics_of_path(target_files, device, num_workers)
     m2, s2 = compute_statistics_of_path(reference_files, device, num_workers)
     fid_value = calculate_frechet_distance(m1, s1, m2, s2)

@@ -279,7 +279,7 @@ class ESM_sampler():
         return next(self.log_likelihood_batch([seq], with_masking, verbose, mask_distance, batch_size))
 
     #TODO: convert to iterator
-    def log_likelihood_batch(self, seq_list, with_masking=True, verbose=False, mask_distance=float("inf"), batch_size=None) -> Iterator[Tuple[float,List[float]]]:
+    def log_likelihood_batch(self, seq_list, with_masking=True, verbose=False, mask_distance=float("inf"), batch_size=None, use_repr=False) -> Iterator[Tuple[float,List[float]]]:
 
         # TODO: Allow batching to calculate likelihoods for multiple sequences at a time (how does padding effect likelihoods for sequences shorter than the longest sequence, hopefully not at all).
 
@@ -331,7 +331,11 @@ class ESM_sampler():
 
                         this_batch = tokens_for_seq[batch_start:batch_start + batch_size, :]
                         this_batch = this_batch.cuda() if self.cuda else this_batch
-                        token_probs = torch.log_softmax(self.model.model(this_batch)['logits'], dim=-1)
+                        # print(f'Model: {self.model.model(this_batch)}')
+                        if use_repr:
+                            token_probs = self.model.model(this_batch, repr_layers=[33])['representations'][-1]
+                        else:
+                            token_probs = torch.log_softmax(self.model.model(this_batch)['logits'], dim=-1)
 
                         for i_sample in range(token_probs.shape[0]):
                             for idx_pos in range(range_start, batch_range_end[seq_idx]):
@@ -346,7 +350,11 @@ class ESM_sampler():
                     yield (float(likelihood_sum / len(seq_list[seq_idx])), likelihood_list)
 
             else:  # no masking, so we just need to calculate a single forward pass on the unmasked model
-                token_probs = torch.log_softmax(self.model.model(tokens)['logits'], dim=-1)
+                if use_repr:
+                    token_probs = self.model.model(tokens, repr_layers=[33])['representations'][33]
+                else:
+                    token_probs = torch.log_softmax(self.model.model(tokens)['logits'], dim=-1)
+                # raise KeyError(f'token_probs.shape: {token_probs.shape}')
                 for batch_idx in range(n_batches):
                     log_likelihood_sum = 0.0
                     log_likelihood_list = []
