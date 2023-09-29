@@ -159,10 +159,10 @@ def EVmutation(target_files, orig_seq, results, model_params):
   # Calculate delta E (log-likehood of mutation)
   for i, row in targets.iterrows():
     target = row['mutated_sequence']
-    if len(target) > len(orig_seq):
-      target = target[:len(orig_seq)]
-    else:
-      target = target + "X"*(len(orig_seq)-len(target))
+    # if len(target) > len(orig_seq):
+    #   target = target[:len(orig_seq)]
+    # else:
+    #   target = target + "X"*(len(orig_seq)-len(target))
     mutations = identify_mutation(orig_seq, target)
     extract = extract_mutations(mutations)
     delta_E, delta_E_couplings, delta_E_fields = c.delta_hamiltonian(extract)
