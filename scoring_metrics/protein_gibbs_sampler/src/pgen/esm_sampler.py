@@ -333,7 +333,7 @@ class ESM_sampler():
                         this_batch = this_batch.cuda() if self.cuda else this_batch
                         # print(f'Model: {self.model.model(this_batch)}')
                         if use_repr:
-                            token_probs = self.model.model(this_batch, repr_layers=[33])['representations'][-1]
+                            token_probs = self.model.model(this_batch, repr_layers=[33])['representations'][33]
                         else:
                             token_probs = torch.log_softmax(self.model.model(this_batch)['logits'], dim=-1)
 

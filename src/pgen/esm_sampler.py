@@ -333,7 +333,7 @@ class ESM_sampler():
                         this_batch = this_batch.cuda() if self.cuda else this_batch
                         # print(f'Model: {self.model.model(this_batch)}')
                         if use_repr:
-                            token_probs = self.model.model(this_batch, repr_layers=[33])['representations'][-1]
+                            token_probs = self.model.model(this_batch, repr_layers=[33])['representations'][33].flatten()
                         else:
                             token_probs = torch.log_softmax(self.model.model(this_batch)['logits'], dim=-1)
 
@@ -351,7 +351,7 @@ class ESM_sampler():
 
             else:  # no masking, so we just need to calculate a single forward pass on the unmasked model
                 if use_repr:
-                    token_probs = self.model.model(tokens, repr_layers=[33])['representations'][33]
+                    token_probs = self.model.model(tokens, repr_layers=[33])['representations'][33].flatten()
                 else:
                     token_probs = torch.log_softmax(self.model.model(tokens)['logits'], dim=-1)
                 # raise KeyError(f'token_probs.shape: {token_probs.shape}')
