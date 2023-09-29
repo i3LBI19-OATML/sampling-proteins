@@ -110,6 +110,8 @@ sub_gap_open = args.sub_gap_open
 sub_gap_extend = args.sub_gap_extend
 
 rand_id = randint(10000, 99999) # Necessary for parallelization
+print("===========================================")
+print(f"Using random ID {rand_id} for temporary files")
 
 #concatenate reference sequences
 # Reference sequences
