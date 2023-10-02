@@ -1,5 +1,6 @@
 from typing import Iterator, List, Tuple
 import torch
+import torch.nn.functional as F
 import math
 import random
 from tqdm import trange
@@ -352,6 +353,8 @@ class ESM_sampler():
             else:  # no masking, so we just need to calculate a single forward pass on the unmasked model
                 if use_repr:
                     token_probs = self.model.model(tokens, repr_layers=[33])['representations'][33]
+                    # raise KeyError(f'a) token_probs.shape: {token_probs.shape}')
+                    # token_probs = token_probs.squeeze().mean(dim=0)
                 else:
                     token_probs = torch.log_softmax(self.model.model(tokens)['logits'], dim=-1)
                 # raise KeyError(f'token_probs.shape: {token_probs.shape}')

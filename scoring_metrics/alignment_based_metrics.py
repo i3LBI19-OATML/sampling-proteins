@@ -143,6 +143,7 @@ def substitution_score(target_seqs_file, reference_seqs_file, substitution_matri
       add_metric(results, qn, substitution_matrix, mutant_score)
     if Identity_to_closest_reference:      
       add_metric(results, qn, "Identity", identity)
+      add_metric(results, qn, "SD", dist)
 
 def EVmutation(target_files, orig_seq, results, model_params):
   # Load Model

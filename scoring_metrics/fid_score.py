@@ -164,7 +164,7 @@ def calculate_fid_given_paths(target_files, reference_files, device, num_workers
     # print(f'target_files:{target_files}, reference_files:{reference_files}')
     m1, s1 = compute_statistics_of_path(target_files, device, num_workers)
     m2, s2 = compute_statistics_of_path(reference_files, device, num_workers)
-    fid_value = calculate_frechet_distance(m1, s1, m2, s2)
+    fid_value = calculate_frechet_distance(m1, s1, m2, s2) * 1000
 
     # result = {"fid": fid_value}
     # df = pd.DataFrame.from_dict(result, orient="index")
