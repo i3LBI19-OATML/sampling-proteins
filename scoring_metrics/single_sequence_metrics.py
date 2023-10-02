@@ -140,7 +140,7 @@ def Tranception(target_files, orig_seq, results, device, model_type="Small"):
                                     scoring_mirror=False, 
                                     batch_size_inference=20,  
                                     num_workers=0, 
-                                    indel_mode=False
+                                    indel_mode=True
                                     )
     print("Tranception scores computed")
     scores = pd.merge(scores,targets,on="mutated_sequence",how="left")
