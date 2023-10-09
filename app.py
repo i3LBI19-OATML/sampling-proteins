@@ -318,7 +318,7 @@ def load_savedmodel(model_path):
 def predict_evmutation(DMS, orig_seq, top_n, ev_model):
   # Load Model
   # c = CouplingsModel(model_params)
-  c = model
+  c = ev_model
   e_result = []
   # Load targets
   targets = DMS['mutated_sequence']
@@ -333,6 +333,7 @@ def predict_evmutation(DMS, orig_seq, top_n, ev_model):
   return DMS.head(top_n)[['mutated_sequence', 'mutant']]
 
 def get_attention_mutants(sequence:str, extra_mutants:pd.DataFrame, mutation_range_start=None,mutation_range_end=None,scoring_mirror=False,batch_size_inference=20,max_number_positions_per_heatmap=50,num_workers=0,AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=False, Tranception_model="./Tranception"):
+  raise NotImplementedError
   if sequence is not None:
     if mutation_range_start is None: mutation_range_start=1
     if mutation_range_end is None: mutation_range_end=len(sequence)
