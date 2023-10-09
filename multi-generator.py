@@ -1,6 +1,8 @@
 import app
 import argparse
 from transformers import PreTrainedTokenizerFast
+from tranception import config, model_pytorch
+import tranception
 import pandas as pd
 import os
 import util
@@ -50,6 +52,19 @@ tokenizer = PreTrainedTokenizerFast(tokenizer_file=os.path.join(os.path.dirname(
                                                 mask_token="[MASK]"
                                             )
 assert args.model or args.Tmodel, "Either model size or model path must be specified"
+model_type = args.model.capitalize() if args.model else None
+# Load model
+try:
+    model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path=args.Tmodel, local_files_only=True)
+    print("Model successfully loaded from local")
+except:
+    print("Model not found locally, downloading from HuggingFace")
+    if model_type=="Small":
+        model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Small")
+    elif model_type=="Medium":
+        model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Medium")
+    elif model_type=="Large":
+        model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Large")
 
 
 # example_sequence = {'MDH_A0A075B5H0': 'MTQRKKISLIGAGNIGGTLAHLIAQKELGDVVLFDIVEGMPQGKALDISHSSPIMGSNVKITGTNNYEDIKGSDVVIITAGIPRKPGKSDKEWSRDDLLSVNAKIMKDVAENIKKYCPNAFVIVVTNPLDVMVYVLHKYSGLPHNKVCGMAGVLDSSRFRYFLAEKLNVSPNDVQAMVIGGHGDTMVPLTRYCTVGGIPLTEFIKQGWITQEEIDEIVERTRNAGGEIVNLLKTGSAYFAPAASAIEMAESYLKDKKRILPCSAYLEGQYGVKDLFVGVPVIIGKNGVEKIIELELTEEEQEMFDKSVESVRELVETVKKLNALEHHHHHH',
@@ -58,7 +73,6 @@ assert args.model or args.Tmodel, "Either model size or model path must be speci
 
 mutation_start = args.mutation_start
 mutation_end = args.mutation_end
-model = args.model.capitalize()
 sequence_num = args.sequence_num
 evolution_cycles = args.evolution_cycles
 generated_sequence = []
@@ -135,7 +149,6 @@ while len(generated_sequence) < sequence_num:
             if mutation_count == 1:
                 # 1. Generate and score suggested mutation
                 score_heatmap, suggested_mutation, scores, single_DMS = app.score_and_create_matrix_all_singles(seq, mutation_start, mutation_end, 
-                                                                                            model, 
                                                                                             scoring_mirror=args.use_scoring_mirror, 
                                                                                             batch_size_inference=args.batch, 
                                                                                             max_number_positions_per_heatmap=args.max_pos, 
@@ -143,7 +156,7 @@ while len(generated_sequence) < sequence_num:
                                                                                             AA_vocab=AA_vocab, 
                                                                                             tokenizer=tokenizer,
                                                                                             with_heatmap=args.with_heatmap,
-                                                                                            Tranception_model=Tmodel)
+                                                                                            Tranception_model=model)
 
                 last_round_DMS = single_DMS
                 # Save heatmap
@@ -183,18 +196,18 @@ while len(generated_sequence) < sequence_num:
                     mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
                     trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
                     _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=trimmed,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
-                                                            model_type=model, scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
+                                                            scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
                                                             max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
-                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=Tmodel)
+                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
                     extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
                 
                 if args.use_ams:
                     mutation = top_k_sampling(scores, k=int(10), sampler=final_sampler, multi=True)
                     att_mutations = app.get_attention_mutants() # TODO: Get attention mutants
                     _, scored_att_mutations, att_mutations = app.score_multi_mutations(seq,extra_mutants=att_mutations,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
-                                                            model_type=model, scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
+                                                            scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
                                                             max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
-                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=Tmodel)
+                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
                     extra_mutants = top_k_sampling(scored_att_mutations, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
                 
                 print(f"Using {len(extra_mutants)} variants for scoring")
@@ -204,14 +217,13 @@ while len(generated_sequence) < sequence_num:
                                                                                 extra_mutants=extra_mutants,
                                                                                 mutation_range_start=mutation_start, 
                                                                                 mutation_range_end=mutation_end, 
-                                                                                model_type=model, 
                                                                                 scoring_mirror=args.use_scoring_mirror, 
                                                                                 batch_size_inference=args.batch, 
                                                                                 max_number_positions_per_heatmap=args.max_pos, 
                                                                                 num_workers=args.num_workers, 
                                                                                 AA_vocab=AA_vocab, 
                                                                                 tokenizer=tokenizer,
-                                                                                Tranception_model=Tmodel)
+                                                                                Tranception_model=model)
 
                 last_round_DMS = extra_DMS
                 # Save scores
@@ -245,18 +257,18 @@ while len(generated_sequence) < sequence_num:
                     mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
                     trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
                     _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=trimmed,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
-                                                            model_type=model, scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
+                                                            scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
                                                             max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
-                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=Tmodel)
+                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
                     extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
                 
                 if args.use_ams:
                     mutation = top_k_sampling(scores, k=int(10), sampler=final_sampler, multi=True)
                     att_mutations = app.get_attention_mutants() # TODO: Get attention mutants
                     _, scored_att_mutations, att_mutations = app.score_multi_mutations(seq,extra_mutants=att_mutations,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
-                                                            model_type=model, scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
+                                                            scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
                                                             max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
-                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=Tmodel)
+                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
                     extra_mutants = top_k_sampling(scored_att_mutations, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
                 
                 print(f"Using {len(extra_mutants)} variants for scoring")
@@ -266,14 +278,13 @@ while len(generated_sequence) < sequence_num:
                                                                                 extra_mutants=extra_mutants,
                                                                                 mutation_range_start=mutation_start, 
                                                                                 mutation_range_end=mutation_end, 
-                                                                                model_type=model, 
                                                                                 scoring_mirror=args.use_scoring_mirror, 
                                                                                 batch_size_inference=args.batch, 
                                                                                 max_number_positions_per_heatmap=args.max_pos, 
                                                                                 num_workers=args.num_workers, 
                                                                                 AA_vocab=AA_vocab, 
                                                                                 tokenizer=tokenizer,
-                                                                                Tranception_model=Tmodel)
+                                                                                Tranception_model=model)
 
                 # Save scores
                 if args.save_scores:

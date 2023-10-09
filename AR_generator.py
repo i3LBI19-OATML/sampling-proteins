@@ -1,6 +1,8 @@
 import app
 import argparse
 from transformers import PreTrainedTokenizerFast
+from tranception import config, model_pytorch
+import tranception
 import pandas as pd
 import os
 import util
@@ -39,8 +41,20 @@ tokenizer = PreTrainedTokenizerFast(tokenizer_file=os.path.join(os.path.dirname(
                                                 mask_token="[MASK]"
                                             )
 assert args.model or args.Tmodel, "Either model size or model path must be specified"
+model_type = args.model.capitalize() if args.model else None
+# Load model
+try:
+    model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path=args.Tmodel, local_files_only=True)
+    print("Model successfully loaded from local")
+except:
+    print("Model not found locally, downloading from HuggingFace")
+    if model_type=="Small":
+        model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Small")
+    elif model_type=="Medium":
+        model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Medium")
+    elif model_type=="Large":
+        model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Large")
 
-model = args.model.capitalize()
 sequence_num = args.sequence_num
 seq_length = args.seq_length
 AA_extension = args.extension_factor
@@ -78,7 +92,7 @@ while len(generated_sequence) < sequence_num:
         if args.sampling_method == 'mcts':
             sampling_strat = args.sampling_method
             sampling_threshold = args.max_length
-            mutation = AR_MCTS.UCT_search(seq, max_length=args.max_length, model_type=model, tokenizer=tokenizer, AA_vocab=AA_vocab, extension_factor=AA_extension, Tmodel=args.Tmodel)
+            mutation = AR_MCTS.UCT_search(seq, max_length=args.max_length, tokenizer=tokenizer, AA_vocab=AA_vocab, extension_factor=AA_extension, Tmodel=model)
             # print("MCTS mutation: ", mutation)
         
         else:
@@ -90,7 +104,6 @@ while len(generated_sequence) < sequence_num:
                                                         extra_mutants=extended_seq,
                                                         mutation_range_start=None, 
                                                         mutation_range_end=None, 
-                                                        model_type=model, 
                                                         scoring_mirror=args.use_scoring_mirror, 
                                                         batch_size_inference=args.batch, 
                                                         max_number_positions_per_heatmap=args.max_pos, 
@@ -98,7 +111,7 @@ while len(generated_sequence) < sequence_num:
                                                         AA_vocab=AA_vocab, 
                                                         tokenizer=tokenizer,
                                                         AR_mode=True,
-                                                        Tranception_model=args.Tmodel,)
+                                                        Tranception_model=model,)
 
             # Save scores
             if args.save_scores:
@@ -116,7 +129,7 @@ while len(generated_sequence) < sequence_num:
                 mutation = ARtop_k_sampling(scores, k=int(sampling_threshold), sampler=final_sampler)
             elif sampling_strat == 'beam_search':
                 assert args.max_length < seq_length, "Maximum length must be less than the length of the final sequence"
-                mutation = ARbeam_search(scores, beam_width=int(sampling_threshold), max_length=args.max_length, model_type=model, tokenizer=tokenizer, sampler=final_sampler, Tmodel=args.Tmodel)
+                mutation = ARbeam_search(scores, beam_width=int(sampling_threshold), max_length=args.max_length, tokenizer=tokenizer, sampler=final_sampler, Tmodel=model)
             elif sampling_strat == 'top_p':
                 assert float(sampling_threshold) <= 1.0 and float(sampling_threshold) > 0, "Top-p sampling threshold must be between 0 and 1"
                 mutation = ARtop_p_sampling(scores, p=float(sampling_threshold), sampler=final_sampler)
