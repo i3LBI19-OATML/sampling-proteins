@@ -225,7 +225,7 @@ dependencies:
       - sequence-models==1.7.0
       - fair-esm==0.4.2
       - "git+https://github.com/facebookresearch/esm.git@e5e7b06b9a093706607c229ab1c5c9821806814d" # ESM
-      - -e .
+      - -e ./scoring_metrics/protein_gibbs_sampler
       - torch-scatter -f https://data.pyg.org/whl/torch-1.13.1+cu117.html
       - torch-sparse -f https://data.pyg.org/whl/torch-1.13.1+cu117.html
       - torch-cluster -f https://data.pyg.org/whl/torch-1.13.1+cu117.html

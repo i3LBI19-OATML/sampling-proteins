@@ -200,17 +200,22 @@ def get_mutated_protein(sequence,mutant):
     mutated_sequence[position-1]=to_AA
   return ''.join(mutated_sequence)
 
-def score_and_create_matrix_all_singles(sequence,mutation_range_start=None,mutation_range_end=None,model_type="Small",scoring_mirror=False,batch_size_inference=20,max_number_positions_per_heatmap=50,num_workers=0,AA_vocab=AA_vocab, tokenizer=tokenizer, with_heatmap=True):
+def score_and_create_matrix_all_singles(sequence,mutation_range_start=None,mutation_range_end=None,model_type="Small",scoring_mirror=False,batch_size_inference=20,max_number_positions_per_heatmap=50,num_workers=0,AA_vocab=AA_vocab, tokenizer=tokenizer, with_heatmap=True, Tranception_model="./Tranception"):
   if mutation_range_start is None: mutation_range_start=1
   if mutation_range_end is None: mutation_range_end=len(sequence)
   assert len(sequence) > 0, "no sequence entered"
   assert mutation_range_start <= mutation_range_end, "mutation range is invalid"
-  if model_type=="Small":
-    model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Small")
-  elif model_type=="Medium":
-    model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Medium")
-  elif model_type=="Large":
-    model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Large")
+  try:
+    model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path=Tranception_model, local_files_only=True)
+    print("Model successfully loaded from local")
+  except:
+    print("Model not found locally, downloading from HuggingFace")
+    if model_type=="Small":
+      model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Small")
+    elif model_type=="Medium":
+      model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Medium")
+    elif model_type=="Large":
+      model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Large")
   if torch.cuda.is_available():
     model.cuda()
     print("Inference will take place on GPU")
@@ -301,10 +306,63 @@ def predict_proteinBERT(model, DMS, input_encoder, top_n, batch_size):
 
   DMS['prediction'] = y_pred
   DMS = DMS.sort_values(by = 'prediction', ascending = False, ignore_index = True)
-  DMS = DMS.head(top_n)
-  return DMS[['mutated_sequence', 'mutant']]
+  # DMS = DMS.head(top_n)
+  return DMS.head(top_n)[['mutated_sequence', 'mutant']]
 
 def load_savedmodel(model_path):
   model = keras.models.load_model(model_path)
   return model
 
+def predict_evmutation(DMS, orig_seq, top_n, ev_model):
+  # Load Model
+  # c = CouplingsModel(model_params)
+  c = model
+  e_result = []
+  # Load targets
+  targets = DMS['mutated_sequence']
+  for i, row in targets.iterrows():
+    target = row['mutated_sequence']
+    mutations = identify_mutation(orig_seq, target)
+    extract = extract_mutations(mutations)
+    delta_E, delta_E_couplings, delta_E_fields = c.delta_hamiltonian(extract)
+    e_result.append(delta_E)
+  DMS['EVmutation'] = e_result
+  DMS = DMS.sort_values(by = 'EVmutation', ascending = False, ignore_index = True)
+  return DMS.head(top_n)[['mutated_sequence', 'mutant']]
+
+def get_attention_mutants(sequence:str, extra_mutants:pd.DataFrame, mutation_range_start=None,mutation_range_end=None,model_type="Small",scoring_mirror=False,batch_size_inference=20,max_number_positions_per_heatmap=50,num_workers=0,AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=False, Tranception_model="./Tranception"):
+  if sequence is not None:
+    if mutation_range_start is None: mutation_range_start=1
+    if mutation_range_end is None: mutation_range_end=len(sequence)
+    assert mutation_range_start <= mutation_range_end, "mutation range is invalid"
+
+  try:
+    model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path=Tranception_model, local_files_only=True)
+    print("Model successfully loaded from local")
+  except:
+    print("Model not found locally, downloading from HuggingFace")
+    if model_type=="Small":
+      model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Small")
+    elif model_type=="Medium":
+      model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Medium")
+    elif model_type=="Large":
+      model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Large")
+  if torch.cuda.is_available():
+    model.cuda()
+    print("Inference will take place on GPU")
+  else:
+    print("Inference will take place on CPU")
+  model.config.tokenizer = tokenizer
+  scores = model.score_mutants(DMS_data=extra_mutants, 
+                                    target_seq=sequence, 
+                                    scoring_mirror=scoring_mirror, 
+                                    batch_size_inference=batch_size_inference,  
+                                    num_workers=num_workers, 
+                                    indel_mode=False
+                                    )
+  print("Scoring done")
+  scores = pd.merge(scores,extra_mutants,on="mutated_sequence",how="left")
+
+  
+
+    

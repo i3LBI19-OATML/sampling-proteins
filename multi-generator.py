@@ -10,10 +10,12 @@ from proteinbert.model_generation import InputEncoder
 import time
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--sequence', type=str, choices=["mdh_esm", "mdh_esm_2", "avGFP"], default='mdh_esm', help='Sequence to do mutation or DE')
+parser.add_argument('--sequence', type=str, help='Sequence for mutation')
+parser.add_argument('--seq_id', type=str, help='Sequence ID for mutation')
 parser.add_argument('--mutation_start', type=int, default=None, help='Mutation start position')
 parser.add_argument('--mutation_end', type=int, default=None, help='Mutation end position')
 parser.add_argument('--model', type=str, choices=['small', 'medium', 'large'], default='small', help='Tranception model size')
+parser.add_argument('--Tmodel', type=str, help='Tranception model path')
 parser.add_argument('--use_scoring_mirror', action='store_true', help='Whether to score the sequence from both ends')
 parser.add_argument('--batch', type=int, default=20, help='Batch size for scoring')
 parser.add_argument('--max_pos', type=int, default=50, help='Maximum number of positions per heatmap')
@@ -25,8 +27,13 @@ parser.add_argument('--save_scores', action='store_true', help='Whether to save 
 parser.add_argument('--sampling_method', type=str, choices=['top_k', 'top_p', 'typical', 'mirostat', 'random', 'greedy'], required=True, help='Sampling method')
 parser.add_argument('--sampling_threshold', type=float, help='Sampling threshold (k for top_k, p for top_p, tau for mirostat, etc.)')
 parser.add_argument('--intermediate_threshold', type=int, required=True, help='Top-K threshold for intermediate sampling')
-parser.add_argument('--use_quantfun', action='store_true', help='Whether to use Quantitative-Function Filtering')
+parser.add_argument('--use_qff', action='store_true', help='Whether to use Quantitative-Function Filtering')
+parser.add_argument('--use_hpf', action='store_true', help='Whether to use High-Probability Filtering')
+parser.add_argument('--use_ams', action='store_true', help='Whether to use Attention-Matrix Sampling')
+parser.add_argument('--proteinbert', action='store_true', help='Whether to use ProteinBERT for Quantitative-Function Filtering')
+parser.add_argument('--evmutation', action='store_true', help='Whether to use EVmutation for Quantitative-Function Filtering')
 parser.add_argument('--saved_model_dir', type=str, help='ProteinBERT saved model directory')
+parser.add_argument('--evmutation_model_dir', type=str, help='EVmutation model directory')
 parser.add_argument('--temperature', type=float, default=1.0, help='Temperature for final sampling; 1.0 equals to random sampling')
 parser.add_argument('--sequence_num', type=int, required=True, help='Number of sequences to generate')
 parser.add_argument('--evolution_cycles', type=int, required=True, help='Number of evolution cycles per generated sequence')
@@ -42,10 +49,12 @@ tokenizer = PreTrainedTokenizerFast(tokenizer_file=os.path.join(os.path.dirname(
                                                 cls_token="[CLS]",
                                                 mask_token="[MASK]"
                                             )
+assert args.model or args.Tmodel, "Either model size or model path must be specified"
 
-example_sequence = {'MDH_A0A075B5H0': 'MTQRKKISLIGAGNIGGTLAHLIAQKELGDVVLFDIVEGMPQGKALDISHSSPIMGSNVKITGTNNYEDIKGSDVVIITAGIPRKPGKSDKEWSRDDLLSVNAKIMKDVAENIKKYCPNAFVIVVTNPLDVMVYVLHKYSGLPHNKVCGMAGVLDSSRFRYFLAEKLNVSPNDVQAMVIGGHGDTMVPLTRYCTVGGIPLTEFIKQGWITQEEIDEIVERTRNAGGEIVNLLKTGSAYFAPAASAIEMAESYLKDKKRILPCSAYLEGQYGVKDLFVGVPVIIGKNGVEKIIELELTEEEQEMFDKSVESVRELVETVKKLNALEHHHHHH',
-                    'MDH_A0A2V9QQ45': 'MRKKVTIVGSGNVGATAAQRIVDKELADVVLIDIIEGVPQGKGLDLLQSGPIEGYDSHVLGTNDYKDTANSDIVVITAGLPRRPGMSRDDLLIKNYEIVKGVTEQVVKYSPHSILIVVSNPLDAMVQTAFKISGFPKNRVIGMAGVLDSARFRTFIAMELNVSVENIHAFVLGGHGDTMVPLPRYSTVAGIPITELLPRERIDALVKRTRDGGAEIVGLLKTGSAYYAPSAATVEMVEAIFKDKKKILPCAAYLEGEYGISGSYVGVPVKLGKSGVEEIIQIKLTPEENAALKKSANAVKELVDIIKV',
-                    'avGFP': 'MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTTGKLPVPWPTLVTTFSYGVQCFSRYPDHMKQHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLADHYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGITHGMDELYK'}
+
+# example_sequence = {'MDH_A0A075B5H0': 'MTQRKKISLIGAGNIGGTLAHLIAQKELGDVVLFDIVEGMPQGKALDISHSSPIMGSNVKITGTNNYEDIKGSDVVIITAGIPRKPGKSDKEWSRDDLLSVNAKIMKDVAENIKKYCPNAFVIVVTNPLDVMVYVLHKYSGLPHNKVCGMAGVLDSSRFRYFLAEKLNVSPNDVQAMVIGGHGDTMVPLTRYCTVGGIPLTEFIKQGWITQEEIDEIVERTRNAGGEIVNLLKTGSAYFAPAASAIEMAESYLKDKKRILPCSAYLEGQYGVKDLFVGVPVIIGKNGVEKIIELELTEEEQEMFDKSVESVRELVETVKKLNALEHHHHHH',
+#                     'MDH_A0A2V9QQ45': 'MRKKVTIVGSGNVGATAAQRIVDKELADVVLIDIIEGVPQGKGLDLLQSGPIEGYDSHVLGTNDYKDTANSDIVVITAGLPRRPGMSRDDLLIKNYEIVKGVTEQVVKYSPHSILIVVSNPLDAMVQTAFKISGFPKNRVIGMAGVLDSARFRTFIAMELNVSVENIHAFVLGGHGDTMVPLPRYSTVAGIPITELLPRERIDALVKRTRDGGAEIVGLLKTGSAYYAPSAATVEMVEAIFKDKKKILPCAAYLEGEYGISGSYVGVPVKLGKSGVEEIIQIKLTPEENAALKKSANAVKELVDIIKV',
+#                     'avGFP': 'MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTTGKLPVPWPTLVTTFSYGVQCFSRYPDHMKQHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLADHYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGITHGMDELYK'}
 
 mutation_start = args.mutation_start
 mutation_end = args.mutation_end
@@ -67,35 +76,50 @@ if args.sampling_method in ['top_k', 'top_p', 'typical', 'mirostat']:
     assert args.sampling_threshold is not None, "Sampling threshold must be specified for top_k, top_p, and mirostat sampling methods"
 assert args.intermediate_threshold <= 100, "Intermediate sampling threshold cannot be greater than 100!"
 
-if args.use_quantfun:
-    assert args.saved_model_dir is not None, "Please specify the saved model directory for Quantitative Filter!"
-    physical_devices = tf.config.experimental.list_physical_devices('GPU')
-    assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
-    config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
+assert args.use_qff or args.use_hpf or args.use_ams, "Please specify at least one filter-sampling method!"
+if args.use_qff:
+    if args.proteinbert:
+        assert args.saved_model_dir is not None, "Please specify the saved model directory for Quantitative Filter!"
+        physical_devices = tf.config.experimental.list_physical_devices('GPU')
+        assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
+        config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-    model_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"{args.saved_model_dir}")
+        model_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"{args.saved_model_dir}")
+        
+        input_encoder = InputEncoder(n_annotations=8943) # Check this number
+        proteinbert_model = app.load_savedmodel(model_path=model_path)
+        strat = "ProteinBERT"
     
-    input_encoder = InputEncoder(n_annotations=8943) # Check this number
-    proteinbert_model = app.load_savedmodel(model_path=model_path)
-    strat = "Quantitative-Function Filter"
-    print("Quantitative-Function Filter will be used!")
-else:
+    if args.evmutation:
+        ev_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"{args.evmutation_model_dir}")
+        assert os.path.exists(ev_dir), f"Model directory {ev_dir} does not exist"
+        ev_model = CouplingsModel(ev_dir)
+        strat = "EVmutation"
+
+    print(f"{strat} Quantitative-Function Filter will be used!")
+if args.use_hpf:
     assert args.intermediate_threshold is not None, "Please specify the intermediate threshold for High-Probability Filter!"
     strat = "High-Probability Filter"
     print("High-Probability Filter will be used!")
+if args.use_ams:
+    assert args.intermediate_threshold is not None, "Please specify the intermediate threshold for Attention-Matrix Sampling!"
+    strat = "Attention-Matrix Sampling"
+    print("Attention-Matrix Sampling will be used!")
 
 while len(generated_sequence) < sequence_num:
 
     iteration = 0
-    if args.sequence == 'mdh_esm':
-        seq = example_sequence.get('MDH_A0A075B5H0')
-        sequence_id = 'MDH_A0A075B5H0'
-    elif args.sequence == 'mdh_esm_2':
-        seq = example_sequence.get('MDH_A0A2V9QQ45')
-        sequence_id = 'MDH_A0A2V9QQ45'
-    elif args.sequence == 'avGFP':
-        seq = example_sequence.get('avGFP')
-        sequence_id = 'avGFP'
+    seq = args.sequence
+    sequence_id = args.seq_id
+    # if args.sequence == 'mdh_esm':
+    #     seq = example_sequence.get('MDH_A0A075B5H0')
+    #     sequence_id = 'MDH_A0A075B5H0'
+    # elif args.sequence == 'mdh_esm_2':
+    #     seq = example_sequence.get('MDH_A0A2V9QQ45')
+    #     sequence_id = 'MDH_A0A2V9QQ45'
+    # elif args.sequence == 'avGFP':
+    #     seq = example_sequence.get('avGFP')
+    #     sequence_id = 'avGFP'
     start_time = time.time()
     mutation_history = []
 
@@ -118,7 +142,8 @@ while len(generated_sequence) < sequence_num:
                                                                                             num_workers=args.num_workers, 
                                                                                             AA_vocab=AA_vocab, 
                                                                                             tokenizer=tokenizer,
-                                                                                            with_heatmap=args.with_heatmap)
+                                                                                            with_heatmap=args.with_heatmap,
+                                                                                            Tranception_model=Tmodel)
 
                 last_round_DMS = single_DMS
                 # Save heatmap
@@ -147,13 +172,31 @@ while len(generated_sequence) < sequence_num:
                 all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
                 
                 # 2. Sample extra mutations
-                if args.use_quantfun:
-                    all_extra_mutants = all_extra_mutants.sample(n=100)
-                    extra_mutants = app.predict_proteinBERT(model=proteinbert_model, DMS=all_extra_mutants,input_encoder=input_encoder, top_n=intermediate_sampling_threshold, batch_size=128)
-                else:
+                if args.use_qff:
+                    if args.proteinbert:
+                        all_extra_mutants = all_extra_mutants.sample(n=100)
+                        extra_mutants = app.predict_proteinBERT(model=proteinbert_model, DMS=all_extra_mutants,input_encoder=input_encoder, top_n=intermediate_sampling_threshold, batch_size=128)
+                    if args.evmutation:
+                        extra_mutants = app.predict_evmutation(DMS=all_extra_mutants, orig_seq=args.sequence.upper(), top_n=intermediate_sampling_threshold, ev_model=ev_model)
+                
+                if args.use_hpf:
                     mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
                     trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
-                    extra_mutants = trimmed.sample(n=intermediate_sampling_threshold)
+                    _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=trimmed,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
+                                                            model_type=model, scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
+                                                            max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
+                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=Tmodel)
+                    extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
+                
+                if args.use_ams:
+                    mutation = top_k_sampling(scores, k=int(10), sampler=final_sampler, multi=True)
+                    att_mutations = app.get_attention_mutants() # TODO: Get attention mutants
+                    _, scored_att_mutations, att_mutations = app.score_multi_mutations(seq,extra_mutants=att_mutations,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
+                                                            model_type=model, scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
+                                                            max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
+                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=Tmodel)
+                    extra_mutants = top_k_sampling(scored_att_mutations, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
+                
                 print(f"Using {len(extra_mutants)} variants for scoring")
 
                 # 3. Get scores of sampled mutation
@@ -167,7 +210,8 @@ while len(generated_sequence) < sequence_num:
                                                                                 max_number_positions_per_heatmap=args.max_pos, 
                                                                                 num_workers=args.num_workers, 
                                                                                 AA_vocab=AA_vocab, 
-                                                                                tokenizer=tokenizer)
+                                                                                tokenizer=tokenizer,
+                                                                                Tranception_model=Tmodel)
 
                 last_round_DMS = extra_DMS
                 # Save scores
@@ -190,13 +234,31 @@ while len(generated_sequence) < sequence_num:
                 all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
 
                 # 2. Sample from extra mutations
-                if args.use_quantfun:
-                    all_extra_mutants = all_extra_mutants.sample(n=100)
-                    extra_mutants = app.predict_proteinBERT(model=proteinbert_model, DMS=all_extra_mutants,input_encoder=input_encoder, top_n=intermediate_sampling_threshold, batch_size=128)
-                else:
+                if args.use_qff:
+                    if args.proteinbert:
+                        all_extra_mutants = all_extra_mutants.sample(n=100)
+                        extra_mutants = app.predict_proteinBERT(model=proteinbert_model, DMS=all_extra_mutants,input_encoder=input_encoder, top_n=intermediate_sampling_threshold, batch_size=128)
+                    if args.evmutation:
+                        extra_mutants = app.predict_evmutation(DMS=all_extra_mutants, orig_seq=args.sequence.upper(), top_n=intermediate_sampling_threshold, ev_model=ev_model)
+                
+                if args.use_hpf:
                     mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
                     trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
-                    extra_mutants = trimmed.sample(n=intermediate_sampling_threshold)
+                    _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=trimmed,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
+                                                            model_type=model, scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
+                                                            max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
+                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=Tmodel)
+                    extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
+                
+                if args.use_ams:
+                    mutation = top_k_sampling(scores, k=int(10), sampler=final_sampler, multi=True)
+                    att_mutations = app.get_attention_mutants() # TODO: Get attention mutants
+                    _, scored_att_mutations, att_mutations = app.score_multi_mutations(seq,extra_mutants=att_mutations,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
+                                                            model_type=model, scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
+                                                            max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
+                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=Tmodel)
+                    extra_mutants = top_k_sampling(scored_att_mutations, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
+                
                 print(f"Using {len(extra_mutants)} variants for scoring")
 
                 # 3. Get scores of sampled mutation
@@ -210,7 +272,8 @@ while len(generated_sequence) < sequence_num:
                                                                                 max_number_positions_per_heatmap=args.max_pos, 
                                                                                 num_workers=args.num_workers, 
                                                                                 AA_vocab=AA_vocab, 
-                                                                                tokenizer=tokenizer)
+                                                                                tokenizer=tokenizer,
+                                                                                Tranception_model=Tmodel)
 
                 # Save scores
                 if args.save_scores:
@@ -258,9 +321,9 @@ while len(generated_sequence) < sequence_num:
     sequence_iteration.append(iteration)
     samplings.append(sampling_strat)
     samplingthreshold.append(sampling_threshold)
-    if args.use_quantfun:
-        subsamplings.append('QFF')
-    else:
+    if args.use_qff:
+        subsamplings.append(f'QFF {strat}')
+    if args.use_hpf:
         subsamplings.append('HPF')
     subsamplingthreshold.append(intermediate_sampling_threshold)
     mutants.append(mutation_count)
