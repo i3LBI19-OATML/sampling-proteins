@@ -158,7 +158,7 @@ def random_sampling(scores: pd.DataFrame, sampler = temperature_sampler(temperat
     return scores['mutant'][sampled_score]
 
 
-def beam_search(scores: pd.DataFrame, extra: int, beam_width: int, max_length:int, model_type, tokenizer, score_mirror=False, batch=20, max_pos=50, sampler=temperature_sampler(temperature=1.0), multi=False):
+def beam_search(scores: pd.DataFrame, extra: int, beam_width: int, max_length:int, model_type, tokenizer, score_mirror=False, batch=20, max_pos=50, sampler=temperature_sampler(temperature=1.0), multi=False, Tmodel='./Tranception'):
   length = 1
   while length < max_length:
     # Get top k mutations
@@ -172,7 +172,7 @@ def beam_search(scores: pd.DataFrame, extra: int, beam_width: int, max_length:in
     #   levels = pd.concat([levels, extension], ignore_index=True)
 
     # Score each mutation
-    scores, _ = app.score_multi_mutations(sequence=None, extra_mutants=levels, model_type=model_type, scoring_mirror=score_mirror, batch_size_inference=batch, max_number_positions_per_heatmap=max_pos, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=True)
+    scores, _ = app.score_multi_mutations(sequence=None, extra_mutants=levels, model_type=model_type, scoring_mirror=score_mirror, batch_size_inference=batch, max_number_positions_per_heatmap=max_pos, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=True, Tranception_model=Tmodel)
     length += 1
   if length == max_length:
     scores = top_k_sampling(scores, k=1, sampler=sampler, multi=True)

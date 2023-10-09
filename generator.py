@@ -12,7 +12,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--sequence', type=str, choices=["mdh_esm", "mdh_esm_2", "avGFP"], default='mdh_esm', help='Sequence to do mutation or DE')
 parser.add_argument('--mutation_start', type=int, default=None, help='Mutation start position')
 parser.add_argument('--mutation_end', type=int, default=None, help='Mutation end position')
-parser.add_argument('--model', type=str, choices=['small', 'medium', 'large'], default='small', help='Tranception model size')
+parser.add_argument('--model', type=str, choices=['small', 'medium', 'large'], help='Tranception model size')
+parser.add_argument('--Tmodel', type=str, help='Tranception model path')
 parser.add_argument('--use_scoring_mirror', action='store_true', help='Whether to score the sequence from both ends')
 parser.add_argument('--batch', type=int, default=20, help='Batch size for scoring')
 parser.add_argument('--max_pos', type=int, default=50, help='Maximum number of positions per heatmap')
@@ -38,10 +39,11 @@ tokenizer = PreTrainedTokenizerFast(tokenizer_file=os.path.join(os.path.dirname(
                                                 cls_token="[CLS]",
                                                 mask_token="[MASK]"
                                             )
+assert args.model or args.Tmodel, "Either model size or model path must be specified"
 
-example_sequence = {'MDH_A0A075B5H0': 'MTQRKKISLIGAGNIGGTLAHLIAQKELGDVVLFDIVEGMPQGKALDISHSSPIMGSNVKITGTNNYEDIKGSDVVIITAGIPRKPGKSDKEWSRDDLLSVNAKIMKDVAENIKKYCPNAFVIVVTNPLDVMVYVLHKYSGLPHNKVCGMAGVLDSSRFRYFLAEKLNVSPNDVQAMVIGGHGDTMVPLTRYCTVGGIPLTEFIKQGWITQEEIDEIVERTRNAGGEIVNLLKTGSAYFAPAASAIEMAESYLKDKKRILPCSAYLEGQYGVKDLFVGVPVIIGKNGVEKIIELELTEEEQEMFDKSVESVRELVETVKKLNALEHHHHHH',
-                    'MDH_A0A2V9QQ45': 'MRKKVTIVGSGNVGATAAQRIVDKELADVVLIDIIEGVPQGKGLDLLQSGPIEGYDSHVLGTNDYKDTANSDIVVITAGLPRRPGMSRDDLLIKNYEIVKGVTEQVVKYSPHSILIVVSNPLDAMVQTAFKISGFPKNRVIGMAGVLDSARFRTFIAMELNVSVENIHAFVLGGHGDTMVPLPRYSTVAGIPITELLPRERIDALVKRTRDGGAEIVGLLKTGSAYYAPSAATVEMVEAIFKDKKKILPCAAYLEGEYGISGSYVGVPVKLGKSGVEEIIQIKLTPEENAALKKSANAVKELVDIIKV',
-                    'avGFP': 'MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTTGKLPVPWPTLVTTFSYGVQCFSRYPDHMKQHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLADHYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGITHGMDELYK'}
+# example_sequence = {'MDH_A0A075B5H0': 'MTQRKKISLIGAGNIGGTLAHLIAQKELGDVVLFDIVEGMPQGKALDISHSSPIMGSNVKITGTNNYEDIKGSDVVIITAGIPRKPGKSDKEWSRDDLLSVNAKIMKDVAENIKKYCPNAFVIVVTNPLDVMVYVLHKYSGLPHNKVCGMAGVLDSSRFRYFLAEKLNVSPNDVQAMVIGGHGDTMVPLTRYCTVGGIPLTEFIKQGWITQEEIDEIVERTRNAGGEIVNLLKTGSAYFAPAASAIEMAESYLKDKKRILPCSAYLEGQYGVKDLFVGVPVIIGKNGVEKIIELELTEEEQEMFDKSVESVRELVETVKKLNALEHHHHHH',
+#                     'MDH_A0A2V9QQ45': 'MRKKVTIVGSGNVGATAAQRIVDKELADVVLIDIIEGVPQGKGLDLLQSGPIEGYDSHVLGTNDYKDTANSDIVVITAGLPRRPGMSRDDLLIKNYEIVKGVTEQVVKYSPHSILIVVSNPLDAMVQTAFKISGFPKNRVIGMAGVLDSARFRTFIAMELNVSVENIHAFVLGGHGDTMVPLPRYSTVAGIPITELLPRERIDALVKRTRDGGAEIVGLLKTGSAYYAPSAATVEMVEAIFKDKKKILPCAAYLEGEYGISGSYVGVPVKLGKSGVEEIIQIKLTPEENAALKKSANAVKELVDIIKV',
+#                     'avGFP': 'MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTTGKLPVPWPTLVTTFSYGVQCFSRYPDHMKQHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLADHYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGITHGMDELYK'}
 
 mutation_start = args.mutation_start
 mutation_end = args.mutation_end
@@ -67,15 +69,17 @@ if args.sampling_method == 'beam_search' or args.sampling_method == 'mcts':
 while len(generated_sequence) < sequence_num:
 
     iteration = 0
-    if args.sequence == 'mdh_esm':
-        seq = example_sequence.get('MDH_A0A075B5H0')
-        sequence_id = 'MDH_A0A075B5H0'
-    elif args.sequence == 'mdh_esm_2':
-        seq = example_sequence.get('MDH_A0A2V9QQ45')
-        sequence_id = 'MDH_A0A2V9QQ45'
-    elif args.sequence == 'avGFP':
-        seq = example_sequence.get('avGFP')
-        sequence_id = 'avGFP'
+    seq = args.sequence
+    sequence_id = args.seq_id
+    # if args.sequence == 'mdh_esm':
+    #     seq = example_sequence.get('MDH_A0A075B5H0')
+    #     sequence_id = 'MDH_A0A075B5H0'
+    # elif args.sequence == 'mdh_esm_2':
+    #     seq = example_sequence.get('MDH_A0A2V9QQ45')
+    #     sequence_id = 'MDH_A0A2V9QQ45'
+    # elif args.sequence == 'avGFP':
+    #     seq = example_sequence.get('avGFP')
+    #     sequence_id = 'avGFP'
     start_time = time.time()
     mutation_history = []
 
@@ -84,7 +88,7 @@ while len(generated_sequence) < sequence_num:
         print("=========================================")
 
         if args.sampling_method == 'mcts':
-            mutation = MCTS.UCT_search(seq, max_length=args.max_length, extra=1, model_type=model, tokenizer=tokenizer, AA_vocab=AA_vocab)
+            mutation = MCTS.UCT_search(seq, max_length=args.max_length, extra=1, model_type=model, tokenizer=tokenizer, AA_vocab=AA_vocab, Tmodel=args.Tmodel)
             sampling_strat = args.sampling_method
             sampling_threshold = args.max_length
         else:
@@ -97,7 +101,8 @@ while len(generated_sequence) < sequence_num:
                                                                                         num_workers=args.num_workers, 
                                                                                         AA_vocab=AA_vocab, 
                                                                                         tokenizer=tokenizer,
-                                                                                        with_heatmap=args.with_heatmap)
+                                                                                        with_heatmap=args.with_heatmap,
+                                                                                        Tranception_model=args.Tmodel)
 
             # Save heatmap
             if args.with_heatmap and args.save_scores:
@@ -119,7 +124,7 @@ while len(generated_sequence) < sequence_num:
             if sampling_strat == 'top_k':
                 mutation = top_k_sampling(scores, k=int(sampling_threshold), sampler=final_sampler)
             elif sampling_strat == 'beam_search':
-                mutation = beam_search(scores, extra=1, beam_width=int(sampling_threshold), max_length=args.max_length, model_type=model, tokenizer=tokenizer, sampler=final_sampler)
+                mutation = beam_search(scores, extra=1, beam_width=int(sampling_threshold), max_length=args.max_length, model_type=model, tokenizer=tokenizer, sampler=final_sampler, Tmodel=args.Tmodel)
             elif sampling_strat == 'top_p':
                 assert float(sampling_threshold) <= 1.0 and float(sampling_threshold) > 0, "Top-p sampling threshold must be between 0 and 1"
                 mutation = top_p_sampling(scores, p=float(sampling_threshold), sampler=final_sampler)
