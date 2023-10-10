@@ -11,6 +11,7 @@ import seaborn as sns
 import os
 from tensorflow import keras
 import itertools
+import re
 
 AA_vocab = "ACDEFGHIKLMNPQRSTVWY"
 tokenizer = PreTrainedTokenizerFast(tokenizer_file=os.path.join(os.path.dirname(os.path.realpath(__file__)), "tranception/utils/tokenizers/Basic_tokenizer"),
@@ -334,22 +335,11 @@ def predict_evmutation(DMS, orig_seq, top_n, ev_model):
 
 def get_attention_mutants(sequence:str, extra_mutants:pd.DataFrame, mutation_range_start=None,mutation_range_end=None,scoring_mirror=False,batch_size_inference=20,max_number_positions_per_heatmap=50,num_workers=0,AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=False, Tranception_model="./Tranception"):
   raise NotImplementedError
+
   if sequence is not None:
     if mutation_range_start is None: mutation_range_start=1
     if mutation_range_end is None: mutation_range_end=len(sequence)
     assert mutation_range_start <= mutation_range_end, "mutation range is invalid"
-
-  # try:
-  #   model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path=Tranception_model, local_files_only=True)
-  #   print("Model successfully loaded from local")
-  # except:
-  #   print("Model not found locally, downloading from HuggingFace")
-  #   if model_type=="Small":
-  #     model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Small")
-  #   elif model_type=="Medium":
-  #     model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Medium")
-  #   elif model_type=="Large":
-  #     model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Large")
   if torch.cuda.is_available():
     model.cuda()
     print("Inference will take place on GPU")
@@ -367,5 +357,19 @@ def get_attention_mutants(sequence:str, extra_mutants:pd.DataFrame, mutation_ran
   scores = pd.merge(scores,extra_mutants,on="mutated_sequence",how="left")
 
   
+def split_mask(s):
+  # Split string using regular expression pattern
+  parts = re.split(r'(\[MASK\])', s)
+  # Replace [MASK] with space
+  parts = [part.replace('[MASK]', ' ') for part in parts]
+  # Remove empty parts
+  parts = [part for part in parts if part]
+  return parts
 
+def replacer(s:str, position:list, replacement:str = '[MASK]'):
+  s_list = list(s)
+  for pos in position:
+    s_list[pos] = replacement
+  s = ''.join(s_list)
+  return s
     

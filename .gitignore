@@ -27,6 +27,3 @@ output_scores.csv
 
 **/*.pdb
 **/*.pae.txt
-
-#under development
-auto-*.py
