@@ -31,7 +31,7 @@ def create_all_single_mutants(sequence,AA_vocab=AA_vocab,mutation_range_start=No
       if current_AA!=mutated_AA:
         mutated_sequence = sequence_list.copy()
         mutated_sequence[position] = mutated_AA
-        all_single_mutants[current_AA+str(position+1)+mutated_AA]="".join(mutated_sequence)
+        all_single_mutants[current_AA+str(mutation_range_start+position)+mutated_AA]="".join(mutated_sequence)
   all_single_mutants = pd.DataFrame.from_dict(all_single_mutants,columns=['mutated_sequence'],orient='index')
   all_single_mutants.reset_index(inplace=True)
   all_single_mutants.columns = ['mutant','mutated_sequence']
