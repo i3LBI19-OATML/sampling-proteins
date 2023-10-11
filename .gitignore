@@ -27,3 +27,6 @@ output_scores.csv
 
 **/*.pdb
 **/*.pae.txt
+
+masked-ar_protgen/*
+ar_protgen/*

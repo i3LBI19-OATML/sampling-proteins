@@ -13,5 +13,6 @@ dependencies:
   - transformers=4.17
   - biopython~=1.78
   - datasets=1.18.3
+  - sentencepiece
   - pip:
       - -e ./protein_bert/

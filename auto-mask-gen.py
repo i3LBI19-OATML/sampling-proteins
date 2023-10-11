@@ -1,65 +1,78 @@
 import tranception
-from transformers import PreTrainedTokenizerFast
+from transformers import PreTrainedTokenizerFast, XLNetTokenizer, AutoTokenizer, AutoModelForCausalLM, XLNetLMHeadModel
 from tranception import config, model_pytorch
 import os
 import torch
 import argparse
 from AR_sampling import estimate_s, compute_k
 import math
-from app import replacer, split_mask
+import time
+import pandas as pd
+import util
+from app import process_prompt_protxlnet, replacer, split_mask
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--prompt', type=str, help='Prompt', required=True)
-parser.add_argument('--Tmodel', type=str, help='Tranception model path', required=True)
-# parser.add_argument('--seq_len', type=int, help='Sequence length')
+parser.add_argument('--model_type', type=str, help='Model type', required=True, choices=['ProtXLNet', 'ProtGPT2', 'RITA', 'Tranception'])
+parser.add_argument('--local_model', type=str, help='Model path', required=True)
 parser.add_argument('--mutation_sites', nargs='+', type=int, help='Mutation sites', required=True)
-parser.add_argument('--num_samples', type=int, help='Number of samples')
-parser.add_argument('--sampling_method', type=str, help='Sampling method')
+parser.add_argument('--num_samples', type=int, help='Number of samples, default=1', default=1)
+parser.add_argument('--sampling_method', type=str, help='Sampling method', required=True, choices=['top_k', 'top_p', 'greedy', 'beam_search', 'random', 'typical', 'mirostat'])
 parser.add_argument('--sampling_threshold', type=float, help='Sampling threshold')
+
+parser.add_argument('--output_name', type=str, help='Output name', required=True)
+parser.add_argument('--save_df', action='store_true', help='Save metadata to CSV')
+parser.add_argument('--debug', action='store_true', help='Debug mode')
 args = parser.parse_args()
 
 AA_vocab = "ACDEFGHIKLMNPQRSTVWY"
-# Load tokenizer
-tokenizer = PreTrainedTokenizerFast(tokenizer_file=os.path.join(os.path.dirname(os.path.realpath(__file__)), "tranception/utils/tokenizers/Basic_tokenizer"),
-                                                unk_token="[UNK]",
-                                                sep_token="[SEP]",
-                                                pad_token="[PAD]",
-                                                cls_token="[CLS]",
-                                                mask_token="[MASK]"
-                                            )
-tokenizer.padding_side = "left" 
-tokenizer.pad_token = tokenizer.eos_token # to avoid an error
-
 # Define arguments for each sampling method
-try:
+if args.sampling_method == 'top_k' or args.sampling_method == 'beam_search':
+    assert args.sampling_threshold >= 2, f"{args.sampling_method} requires threshold >= 2"
     threshold = int(args.sampling_threshold)
-except TypeError:
-    print(f"Invalid sampling threshold: {args.sampling_threshold}")
+elif args.sampling_method == 'top_p' or args.sampling_method == 'typical':
+    assert args.sampling_threshold <= 1 and args.sampling_threshold > 0, f"{args.sampling_method} requires 0 < threshold <= 1"
+    threshold = float(args.sampling_threshold)
+else:
     threshold = 0
 
 sampling_args = {
     'top_k': {'do_sample': True, 'top_k': threshold},
-    'top_p': {'do_sample': True, 'top_p': args.sampling_threshold},
+    'top_p': {'do_sample': True, 'top_p': threshold},
     'greedy': {'do_sample': False},
     'beam_search': {'do_sample': False, 'num_beams': threshold, 'early_stopping': True},
     'random': {'do_sample': True, 'top_k': 0},
-    'typical': {'do_sample': True, 'typical_p': args.sampling_threshold},
+    'typical': {'do_sample': True, 'typical_p': threshold},
     'mirostat': {}
 }
-assert args.sampling_method in sampling_args, f"Invalid sampling method: {args.sampling_method}"
-if args.sampling_method == 'top_k' or args.sampling_method == 'beam_search':
-    assert threshold >= 2, f"{args.sampling_method} requires threshold >= 2"
 
 # Load model
-model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path=args.Tmodel, local_files_only=True)
+print(f"=================STARTING=================")
+if args.model_type == 'Tranception':
+    model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(args.local_model, local_files_only=True)
+    tokenizer = PreTrainedTokenizerFast(tokenizer_file=os.path.join(os.path.dirname(os.path.realpath(__file__)), "tranception/utils/tokenizers/Basic_tokenizer"),
+                                                    unk_token="[UNK]",
+                                                    sep_token="[SEP]",
+                                                    pad_token="[PAD]",
+                                                    cls_token="[CLS]",
+                                                    mask_token="[MASK]"
+                                                )
+elif args.model_type == 'ProtGPT2' or args.model_type == 'RITA':
+    tokenizer = AutoTokenizer.from_pretrained(args.local_model)
+    model = AutoModelForCausalLM.from_pretrained(args.local_model, local_files_only=True, trust_remote_code=True)
+elif args.model_type == 'ProtXLNet':
+    tokenizer = XLNetTokenizer.from_pretrained(args.local_model)
+    model = XLNetLMHeadModel.from_pretrained(args.local_model)
+    
 model.cuda()
 model.config.tokenizer = tokenizer
 print("Model successfully loaded from local")
 
 # Initialize prompt
 orig_prompt = args.prompt.replace(' ', '').upper().strip()
+# Prompt preprocessing
 prompt = replacer(orig_prompt, args.mutation_sites)
-assert '[MASK]' in prompt, 'Prompt must contain [MASK] token'
+prompt = process_prompt_protxlnet(prompt) if args.model_type == 'ProtXLNet' else prompt
 prompt_parts = split_mask(prompt)
 print(f'Prompt: {prompt}')
 print(f'Prompt parts: {prompt_parts}')
@@ -67,19 +80,31 @@ print(f'Prompt length: {len(orig_prompt)}')
 # seq_len = args.seq_len + 2 # +2 for BOS and EOS
 inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
 
+# Initialize list of results
+results = []
+
 print('===============================================')
-print(f'Sampling with {args.sampling_method} method and {args.sampling_threshold} threshold')
+print(f'{args.model_type} with {args.sampling_method} Sampling method and {args.sampling_threshold} threshold')
 print('===============================================')
+overall_start_time = time.time()
 
 for idx in range(args.num_samples): # Generate multiple samples
+    start_time = time.time()
     # Generate text for each prompt part
     generated_texts = ''
     for i, part in enumerate(prompt_parts):
-        prompted_text = generated_texts + part
-        # print(f'Parts: {part}')
-        # print(f'Prompted text: {prompted_text}')
+        part = part.strip() if args.model_type == 'ProtXLNet' else part
+        prompted_text = generated_texts + part if part != '?' else generated_texts
+        prompted_text = process_prompt_protxlnet(prompted_text.replace(' ', '').replace("\n", "")) if args.model_type == 'ProtXLNet' else prompted_text
+        clean_prompted = prompted_text.replace(' ', '').replace("\n", "")
+        if args.debug:
+            print(f'Parts: {part}')
+            print(f'Prompted text: {prompted_text}')
         inputs = tokenizer(prompted_text, return_tensors="pt").to("cuda")
-        if part == ' ':
+        inputs = tokenizer(prompted_text+' ', return_tensors="pt").to("cuda") if args.model_type == 'ProtGPT2' and not prompted_text else inputs
+
+        valid = False if part == '?' else True
+        while not valid:
             # Generate
             if args.sampling_method == 'mirostat':
                 target_surprise = args.sampling_threshold
@@ -88,12 +113,13 @@ for idx in range(args.num_samples): # Generate multiple samples
                 running_tot_surprise = 0
                 learning_rate = 1
                 num_tokens = 1
-                n=len(tokenizer.vocab)
+                n=tokenizer.vocab_size if args.model_type == 'ProtXLNet' else len(tokenizer.vocab)
 
                 # file_string = args.context
                 # f = open(file_string, "r")
                 context_text = prompted_text
                 context = torch.tensor([tokenizer.encode(context_text)])
+                context = torch.tensor([tokenizer.encode(context_text+' ')]) if args.model_type == 'ProtGPT2' and not context_text else context
                 outputs = []
                 prev = context
                 past = None
@@ -111,7 +137,7 @@ for idx in range(args.num_samples): # Generate multiple samples
                     for i in range(num_tokens):
                         forward = model(input_ids=context, past_key_values=past, return_dict=True)
                         logits = forward.logits[0, -1, :]
-                        past = forward.past_key_values
+                        past = forward.past_key_values if args.model_type not in ['ProtXLNet', 'RITA'] else None
 
                         sorted_logits, sorted_indices = torch.sort(logits, descending=True)
                         prob_original = torch.softmax(sorted_logits, dim=-1).tolist()
@@ -141,20 +167,49 @@ for idx in range(args.num_samples): # Generate multiple samples
                 # Decode for mirostat
                 decoded = tokenizer.decode(outputs, skip_special_tokens=True, clean_up_tokenization_spaces=True)
                 decoded = context_text + decoded # Add prompt to decoded sequence
-                generated_texts = decoded.replace(' ', '')[:len(prompted_text)+1]
+                generated_texts = decoded.replace(' ', '').replace("\n", "")[:len(clean_prompted)+1]
 
             else:
                 sampling_kwargs = sampling_args[args.sampling_method]
-                outputs = model.generate(**inputs, min_new_tokens=1, max_new_tokens=1, pad_token_id=tokenizer.eos_token_id,
+                outputs = model.generate(**inputs, min_new_tokens=1, max_new_tokens=2, pad_token_id=tokenizer.eos_token_id,
                                 return_dict_in_generate=True, output_scores=True, **sampling_kwargs)
                 # Decode for other methods
-                decoded = tokenizer.batch_decode(outputs[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
-                generated_texts = decoded[0].replace(' ', '')[:len(prompted_text)+1]
+                decoded = tokenizer.batch_decode(outputs.sequences, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+                generated_texts = decoded[0].replace(' ', '').replace("\n", "")[:len(clean_prompted)+1]
 
-            # print(f'Generated text: {generated_texts}')
-            # print(f'=====================================')
+            # generated_texts = generated_texts.replace(' ', '').replace("\n", "") if args.model_type == 'ProtXLNet' else generated_texts
+            valid = True if generated_texts and len(generated_texts) == len(clean_prompted)+1 and all(token in AA_vocab for token in process_prompt_protxlnet(generated_texts).split()) else False
+            if args.debug:
+                print(f'Generated text: {generated_texts}')
+                print(f'=====================================')
         else:
-            generated_texts = prompted_text
-
+            generated_texts = prompted_text if part != '?' else generated_texts
+            generated_texts = generated_texts.replace(' ', '').replace("\n", "")
     assert len(generated_texts) == len(orig_prompt), f'Sequence length {len(generated_texts)} does not match original {len(orig_prompt)}'
-    print(f'Output {idx+1}_{len(generated_texts)}: {generated_texts}')
+    seq_time_taken = round(time.time() - start_time, 3)
+    print(f'Output {idx+1}_{len(generated_texts)} {seq_time_taken}s: {generated_texts}') # Print sequence
+    
+    # Save results
+    samp_thres = None if threshold == 0 else threshold
+    name = f'{args.model_type}_{idx+1}_{len(generated_texts)}'
+    results.append({'name': name, 'sequence': generated_texts, 'time': seq_time_taken, 'sampling': args.sampling_method, 'threshold': samp_thres})
+
+
+generated_sequence_df = pd.DataFrame(results)
+# Create directory if it doesn't exist
+save_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "masked-ar_protgen")
+
+# Save dataframe to FASTA file
+save_path = os.path.join(save_dir, f"{args.output_name}.fasta")
+os.makedirs(os.path.dirname(save_path), exist_ok=True)
+util.save_as_fasta(generated_sequence_df, save_path)
+print(f"FASTA saved to {save_path}")
+
+# Save dataframe to CSV file if requested
+if args.save_df:
+    save_path = os.path.join(save_dir, f"{args.output_name}.csv")
+    generated_sequence_df.to_csv(save_path, index=False)
+    print(f"Metadata saved to {save_path}")
+
+overall_time_taken = round(time.time() - overall_start_time, 3)
+print(f'===============COMPLETED in {overall_time_taken} seconds=================')

@@ -359,17 +359,23 @@ def get_attention_mutants(sequence:str, extra_mutants:pd.DataFrame, mutation_ran
   
 def split_mask(s):
   # Split string using regular expression pattern
-  parts = re.split(r'(\[MASK\])', s)
+  parts = re.split(r'(\?)', s)
   # Replace [MASK] with space
-  parts = [part.replace('[MASK]', ' ') for part in parts]
+  # parts = [part.replace('?', ' ') for part in parts]
   # Remove empty parts
   parts = [part for part in parts if part]
   return parts
 
-def replacer(s:str, position:list, replacement:str = '[MASK]'):
+def replacer(s:str, position:list, replacement:str = '?'):
   s_list = list(s)
   for pos in position:
     s_list[pos] = replacement
   s = ''.join(s_list)
   return s
     
+def process_prompt_protxlnet(s):
+  # s = s.replace('[MASK]', '?')
+  s = " ".join(s)
+  # s = s.replace('?', '[MASK]')
+  s = re.sub(r"[UZOB]", "<unk>", s)
+  return s
