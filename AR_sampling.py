@@ -11,6 +11,7 @@ import pandas as pd
 import math
 import app
 from decimal import Decimal
+from statistics import mean
 
 AA_vocab = "ACDEFGHIKLMNPQRSTVWY"
 
@@ -113,6 +114,8 @@ def estimate_s(prob):
       b = prob[i]/prob[i+1]
     except ZeroDivisionError:
       b = 0
+    except TypeError:
+      b = mean(prob[i])/mean(prob[i+1])
     t = (i+2)/(i+1)
     num += math.log(b if b>0 else 1)*math.log(t if t>0 else 1)
     den += math.log(t if t>0 else 1)**2
@@ -121,7 +124,7 @@ def estimate_s(prob):
 
 def compute_k(n,s,tau):
     eps = s-1
-    k = Decimal(((eps*(2**(tau)))/(1-n**(-eps)))**(1/s))
+    k = ((eps*(2**(tau)))/(1-n**(-eps)))**(1/s)
     return round(k)
 
 # Mirostat Sampling

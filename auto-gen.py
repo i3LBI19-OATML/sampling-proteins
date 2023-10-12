@@ -97,8 +97,8 @@ for idx in range(args.num_samples):
 
         # file_string = args.context
         # f = open(file_string, "r")
-        context_text = prompt
-        context = torch.tensor([tokenizer.encode(context_text)])
+        # context_text = prompt
+        context = inputs.input_ids #torch.tensor([tokenizer.encode(context_text)]).to("cuda")
         outputs = []
         prev = context
         past = None
@@ -145,7 +145,7 @@ for idx in range(args.num_samples):
 
         # Decode for mirostat
         decoded = tokenizer.decode(outputs, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-        decoded = context_text + decoded # Add prompt to decoded sequence
+        decoded = prompt + decoded # Add prompt to decoded sequence
         seq = decoded.replace(' ', '').replace("\n", "")[:args.seq_len]
 
     else:
@@ -155,7 +155,6 @@ for idx in range(args.num_samples):
         # Decode for other methods
         decoded = tokenizer.batch_decode(outputs.sequences, skip_special_tokens=True, clean_up_tokenization_spaces=True)
         seq = decoded[0].replace(' ', '').replace("\n", "")[:args.seq_len]
-        # print(f'seq: {seq}')
 
     assert len(seq) == args.seq_len, f'Sequence length {len(seq)} does not match {args.seq_len}'
     seq_time_taken = round(time.time() - start_time, 3)
