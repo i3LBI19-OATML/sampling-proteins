@@ -3,6 +3,7 @@ from torch.distributions import Categorical
 import pandas as pd
 import math
 import app
+from decimal import Decimal
 
 AA_vocab = "ACDEFGHIKLMNPQRSTVWY"
 
@@ -113,7 +114,7 @@ def estimate_s(prob):
 
 def compute_k(n,s,tau):
     eps = s-1
-    k = ((eps*(2**(tau)))/(1-n**(-eps)))**(1/s)
+    k = Decimal(((eps*(2**(tau)))/(1-n**(-eps)))**(1/s))
     k = round(k)
     return k
 

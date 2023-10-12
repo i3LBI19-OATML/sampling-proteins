@@ -124,7 +124,7 @@ def estimate_s(prob):
 
 def compute_k(n,s,tau):
     eps = s-1
-    k = ((eps*(2**(tau)))/(1-n**(-eps)))**(1/s)
+    k = Decimal(((eps*(2**(tau)))/(1-n**(-eps)))**(1/s))
     return round(k)
 
 # Mirostat Sampling
