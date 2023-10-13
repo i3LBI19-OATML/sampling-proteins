@@ -33,8 +33,6 @@ parser.add_argument('--intermediate_threshold', type=int, required=True, help='T
 parser.add_argument('--use_qff', action='store_true', help='Whether to use Quantitative-Function Filtering')
 parser.add_argument('--use_hpf', action='store_true', help='Whether to use High-Probability Filtering')
 parser.add_argument('--use_ams', action='store_true', help='Whether to use Attention-Matrix Sampling')
-parser.add_argument('--use_fed', action='store_true', help='Whether to use FED Filtering')
-parser.add_argument('--reference_file', type=str, help='Reference file for FED Filtering')
 parser.add_argument('--proteinbert', action='store_true', help='Whether to use ProteinBERT for Quantitative-Function Filtering')
 parser.add_argument('--evmutation', action='store_true', help='Whether to use EVmutation for Quantitative-Function Filtering')
 parser.add_argument('--saved_model_dir', type=str, help='ProteinBERT saved model directory')
@@ -93,7 +91,7 @@ if args.sampling_method in ['top_k', 'top_p', 'typical', 'mirostat']:
     assert args.sampling_threshold is not None, "Sampling threshold must be specified for top_k, top_p, and mirostat sampling methods"
 assert args.intermediate_threshold <= 100, "Intermediate sampling threshold cannot be greater than 100!"
 
-assert args.use_qff or args.use_hpf or args.use_ams or args.use_fed, "Please specify at least one filter-sampling method!"
+assert args.use_qff or args.use_hpf or args.use_ams, "Please specify at least one filter-sampling method!"
 if args.use_qff:
     if args.proteinbert:
         assert args.saved_model_dir is not None, "Please specify the saved model directory for Quantitative Filter!"
@@ -120,10 +118,6 @@ if args.use_hpf:
 if args.use_ams:
     strat = "Attention-Matrix Sampling"
     print("Attention-Matrix Sampling will be used!")
-if args.use_fed:
-    assert args.reference_file is not None, "Please specify the reference file for FED Filter!"
-    strat = "FED Filter"
-    print("FED Filter will be used!")  
 
 while len(generated_sequence) < sequence_num:
 
@@ -184,19 +178,18 @@ while len(generated_sequence) < sequence_num:
                         extra_mutants = app.predict_evmutation(DMS=all_extra_mutants, orig_seq=args.sequence.upper(), top_n=intermediate_sampling_threshold, ev_model=ev_model)
                 
                 if args.use_hpf:
-                    mutation = top_k_sampling(scores, k=int(10), sampler=final_sampler, multi=True)
+                    mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
                     trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
-                    _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=trimmed,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
-                                                            scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
-                                                            max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
-                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
-                    extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
-                
-                if args.use_fed:
-                    extra_mutants = app.get_FED_predictions(DMS=all_extra_mutants, reference=args.reference_file, top_n=intermediate_sampling_threshold)
-                
+                    # _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=trimmed,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
+                    #                                         scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
+                    #                                         max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
+                    #                                         AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
+                    # extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
+                    extra_mutants = trimmed.sample(n=intermediate_sampling_threshold)
+
+                                
                 if args.use_ams:
-                    # mutation = top_k_sampling(scores, k=int(10), sampler=final_sampler, multi=True)
+                    mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
                     att_mutations = app.get_attention_mutants() # TODO: Get attention mutants
                     _, scored_att_mutations, att_mutations = app.score_multi_mutations(seq,extra_mutants=att_mutations,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
                                                             scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
@@ -240,21 +233,19 @@ while len(generated_sequence) < sequence_num:
                         extra_mutants = app.predict_evmutation(DMS=all_extra_mutants, orig_seq=args.sequence.upper(), top_n=intermediate_sampling_threshold, ev_model=ev_model)
                 
                 if args.use_hpf:
-                    mutation = top_k_sampling(scores, k=int(10), sampler=final_sampler, multi=True)
+                    mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
                     trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
-                    _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=trimmed,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
-                                                            scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
-                                                            max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
-                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
-                    extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
-                    print(f'HPF: {extra_mutants}')
-                
-                if args.use_fed:
-                    extra_mutants = app.get_FED_predictions(DMS=all_extra_mutants, reference=args.reference_file, top_k=intermediate_sampling_threshold)
-                
-                
+                    # _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=trimmed,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
+                    #                                         scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
+                    #                                         max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
+                    #                                         AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
+                    # extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
+                    print(f'trimmed: {trimmed.columns}')
+                    extra_mutants = trimmed.sample(n=intermediate_sampling_threshold)
+                    print(f'HPF final: {extra_mutants.columns}')
+                                
                 if args.use_ams:
-                    mutation = top_k_sampling(scores, k=int(10), sampler=final_sampler, multi=True)
+                    mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
                     att_mutations = app.get_attention_mutants() # TODO: Get attention mutants
                     _, scored_att_mutations, att_mutations = app.score_multi_mutations(seq,extra_mutants=att_mutations,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
                                                             scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 

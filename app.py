@@ -17,10 +17,6 @@ from scoring_metrics.util import identify_mutation, extract_mutations
 from EVmutation.model import CouplingsModel
 from EVmutation.tools import predict_mutation_table
 from sampling import top_k_sampling
-# FID
-from scoring_metrics import fid_score as fid
-import tempfile
-from pgen.utils import parse_fasta
 
 AA_vocab = "ACDEFGHIKLMNPQRSTVWY"
 tokenizer = PreTrainedTokenizerFast(tokenizer_file=os.path.join(os.path.dirname(os.path.realpath(__file__)), "tranception/utils/tokenizers/Basic_tokenizer"),
@@ -31,21 +27,31 @@ tokenizer = PreTrainedTokenizerFast(tokenizer_file=os.path.join(os.path.dirname(
                                                 mask_token="[MASK]"
                                             )
 
-def create_all_single_mutants(sequence,AA_vocab=AA_vocab,mutation_range_start=None,mutation_range_end=None):
-  all_single_mutants= {}
-  sequence_list=list(sequence)
-  if mutation_range_start is None: mutation_range_start=1
-  if mutation_range_end is None: mutation_range_end=len(sequence)
-  for position,current_AA in enumerate(sequence[mutation_range_start-1:mutation_range_end]):
-    for mutated_AA in AA_vocab:
-      if current_AA!=mutated_AA:
-        mutated_sequence = sequence_list.copy()
-        mutated_sequence[position] = mutated_AA
-        all_single_mutants[current_AA+str(mutation_range_start+position)+mutated_AA]="".join(mutated_sequence)
-  all_single_mutants = pd.DataFrame.from_dict(all_single_mutants,columns=['mutated_sequence'],orient='index')
-  all_single_mutants.reset_index(inplace=True)
-  all_single_mutants.columns = ['mutant','mutated_sequence']
-  return all_single_mutants
+# def create_all_single_mutants(sequence,AA_vocab=AA_vocab,mutation_range_start=None,mutation_range_end=None):
+#   all_single_mutants= {}
+#   sequence_list=list(sequence)
+#   if mutation_range_start is None: mutation_range_start=1
+#   if mutation_range_end is None: mutation_range_end=len(sequence)
+#   for position,current_AA in enumerate(sequence[mutation_range_start-1:mutation_range_end]):
+#     for mutated_AA in AA_vocab:
+#       if current_AA!=mutated_AA:
+#         mutated_sequence = sequence_list.copy()
+#         mutated_sequence[position] = mutated_AA
+#         all_single_mutants[current_AA+str(mutation_range_start+position)+mutated_AA]="".join(mutated_sequence)
+#   all_single_mutants = pd.DataFrame.from_dict(all_single_mutants,columns=['mutated_sequence'],orient='index')
+#   all_single_mutants.reset_index(inplace=True)
+#   all_single_mutants.columns = ['mutant','mutated_sequence']
+#   return all_single_mutants
+
+def create_all_single_mutants(sequence, AA_vocab=AA_vocab, mutation_range_start=None, mutation_range_end=None):
+    sequence_list = list(sequence)
+    if mutation_range_start is None: mutation_range_start = 1
+    if mutation_range_end is None: mutation_range_end = len(sequence)
+    positions = range(mutation_range_start-1, mutation_range_end)
+    aas = AA_vocab
+    combos = itertools.product(positions, aas)
+    all_single_mutants = [{'mutant': f"{sequence_list[i]}{i+1}{aa}", 'mutated_sequence': ''.join([aa if j == i else sequence_list[j] for j in range(len(sequence_list))])} for i, aa in combos if sequence_list[i] != aa]
+    return pd.DataFrame(all_single_mutants)
 
 def extend_sequence_by_n(sequence, n: int, reference_vocab, output_sequence=True):
   permut = ["".join(i) for i in itertools.permutations(reference_vocab, n)]
@@ -58,7 +64,6 @@ def extend_sequence_by_n(sequence, n: int, reference_vocab, output_sequence=True
     return df_ext
 
 def generate_n_extra_mutations(DMS_data: pd.DataFrame, extra_mutations: int, AA_vocab=AA_vocab, mutation_range_start=None, mutation_range_end=None):
-    # DMS_data = top_k_sampling(DMS_data, k=k, multi=True)
     variants = DMS_data
     seq = variants["mutated_sequence"][0]
     assert extra_mutations > 0, "Number of mutations must be greater than 0."
@@ -384,26 +389,4 @@ def process_prompt_protxlnet(s):
   # s = s.replace('?', '[MASK]')
   s = re.sub(r"[UZOB]", "<unk>", s)
   return s
-
-def get_FED_predictions(DMS, reference, top_k):
-  FED_score = []
-  with tempfile.TemporaryDirectory() as od:
-    ref_file = od + "/ref_file.fasta"
-    with open(ref_file, "w") as f:
-      for name, seq in zip(*parse_fasta(reference, return_names=True, clean="unalign")):
-        print(f">{name}\n{seq}", file=f)
-    # Run FED
-    for seq in tqdm.tqdm(DMS, total=len(DMS)):
-      with tempfile.TemporaryDirectory() as output_dir:
-        seq_file = output_dir + "/seq_file.tsv"
-        with open(seq_file, "w") as fh:
-          print(f">TARGET\n{seq}", file=fh)
-        
-        # Score
-        score = fid.calculate_fid_given_paths(seq_file, ref_file)
-        FED_score.append(score)
-  
-  DMS['FED'] = FED_score
-  DMS = DMS.sort_values(by = 'FED', ascending = False, ignore_index = True)
-  return DMS.head(top_k)
 
