@@ -6,7 +6,7 @@ from jax.tree_util import tree_map
 import matplotlib.pyplot as plt
 from scipy.special import softmax
 import gc
-# from tqdm import tqdm_notebook as tqdm
+import tqdm
 import tmscoring
 from glob import glob
 import pandas as pd
@@ -67,7 +67,11 @@ for fasta_path in fasta_dir:
   data_df = pd.DataFrame(list(zip(name, seq)), columns = ["name", "seq"])
   # data_df = data_df.head()
 
-for _, row in data_df.iterrows():
+model = torch.load(f'{model_name}')
+model.eval().cuda().requires_grad_(False)
+model_name_ = model_name
+
+for _, row in tqdm.tqdm(data_df.iterrows(), total=len(data_df)):
   jobname = row['name']
   jobname = re.sub(r'\W+', '', jobname)[:50]
 
@@ -104,10 +108,6 @@ for _, row in data_df.iterrows():
       if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    model = torch.load(f'{model_name}')
-    model.eval().cuda().requires_grad_(False)
-    model_name_ = model_name
-
   # optimized for Tesla T4
   if length > 700:
     model.set_chunk_size(64)
@@ -143,7 +143,7 @@ for _, row in data_df.iterrows():
   tmscore = tmscoring.get_tm(reference_pdb, pdb_file)
   tm_list.append(tmscore)
 
-  print(f'ptm: {ptm:.3f} plddt: {plddt:.3f} tmscore: {tmscore:.3f}')
+  # print(f'ptm: {ptm:.3f} plddt: {plddt:.3f} tmscore: {tmscore:.3f}')
 
 results_df = pd.DataFrame(list(zip(id_list, plddt_list, tm_list)), columns = ["seq_name", "plddt", "tm_score"])
 if path_prefix is not None:

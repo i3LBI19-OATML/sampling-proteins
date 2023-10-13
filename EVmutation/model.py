@@ -605,8 +605,8 @@ class CouplingsModel:
             2) delta J_ij, 3) delta h_i
 
         """
-        pos = np.empty(len(substitutions), dtype=np.int)
-        subs = np.empty(len(substitutions), dtype=np.int)
+        pos = np.empty(len(substitutions), dtype=int)
+        subs = np.empty(len(substitutions), dtype=int)
 
         try:
             for i, (subs_pos, subs_from, subs_to) in enumerate(substitutions):

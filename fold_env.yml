@@ -26,4 +26,4 @@ dependencies:
       - git+https://github.com/aqlaboratory/openfold.git@6908936b68ae89f67755240e2f588c09ec31d4c8
       - git+https://github.com/sokrypton/esm.git
       - tmscoring
-      - -e .
+      - -e ./scoring_metrics/protein_gibbs_sampler

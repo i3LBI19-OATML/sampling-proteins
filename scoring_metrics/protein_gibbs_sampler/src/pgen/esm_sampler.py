@@ -93,7 +93,7 @@ class ESM_sampler():
         input_chars = {s for s in cleaned_seq}
         valid_chars = {s for s in ESM_ALLOWED_AMINO_ACIDS}
         if not input_chars.issubset(valid_chars):
-            raise (Exception("Invalid input character: " + ",".join(input_chars-valid_chars)))
+            raise (Exception("Invalid input character: " + ",".join(input_chars-valid_chars) + f"in {input_chars}"))
         return cleaned_seq
 
     def get_init_seq(self, seed_seq, max_len, batch_size = 1):

@@ -159,7 +159,7 @@ def compute_statistics_of_path(path, device, num_workers=8):
     return m, s
 
 
-def calculate_fid_given_paths(target_files, reference_files, device, num_workers=8):
+def calculate_fid_given_paths(target_files, reference_files, device='cuda:0', num_workers=8):
     """Calculates the FID of two paths"""
     # print(f'target_files:{target_files}, reference_files:{reference_files}')
     m1, s1 = compute_statistics_of_path(target_files, device, num_workers)

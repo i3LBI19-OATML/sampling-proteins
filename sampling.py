@@ -173,7 +173,7 @@ def beam_search(scores: pd.DataFrame, extra: int, beam_width: int, max_length:in
     #   levels = pd.concat([levels, extension], ignore_index=True)
 
     # Score each mutation
-    scores, _ = app.score_multi_mutations(sequence=None, extra_mutants=levels, scoring_mirror=score_mirror, batch_size_inference=batch, max_number_positions_per_heatmap=max_pos, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=True, Tranception_model=Tmodel)
+    scores, _ = app.score_multi_mutations(sequence=None, extra_mutants=levels, Tranception_model=Tmodel, scoring_mirror=score_mirror, batch_size_inference=batch, max_number_positions_per_heatmap=max_pos, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=True)
     length += 1
   if length == max_length:
     scores = top_k_sampling(scores, k=1, sampler=sampler, multi=True)

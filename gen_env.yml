@@ -14,5 +14,9 @@ dependencies:
   - biopython~=1.78
   - datasets=1.18.3
   - sentencepiece
+  - numba
+  - biotite
   - pip:
       - -e ./protein_bert/
+      - -e ./scoring_metrics/protein_gibbs_sampler
+      - "git+https://github.com/facebookresearch/esm.git@e5e7b06b9a093706607c229ab1c5c9821806814d"

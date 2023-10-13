@@ -10,10 +10,11 @@ import tensorflow as tf
 from sampling import top_k_sampling, temperature_sampler, top_p_sampling, typical_sampling, mirostat_sampling, random_sampling
 from proteinbert.model_generation import InputEncoder
 import time
+from EVmutation.model import CouplingsModel
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--sequence', type=str, help='Sequence for mutation')
-parser.add_argument('--seq_id', type=str, help='Sequence ID for mutation')
+parser.add_argument('--sequence', type=str, help='Sequence for mutation', required=True)
+parser.add_argument('--seq_id', type=str, help='Sequence ID for mutation', required=True)
 parser.add_argument('--mutation_start', type=int, default=None, help='Mutation start position')
 parser.add_argument('--mutation_end', type=int, default=None, help='Mutation end position')
 parser.add_argument('--model', type=str, choices=['small', 'medium', 'large'], help='Tranception model size')
@@ -32,6 +33,8 @@ parser.add_argument('--intermediate_threshold', type=int, required=True, help='T
 parser.add_argument('--use_qff', action='store_true', help='Whether to use Quantitative-Function Filtering')
 parser.add_argument('--use_hpf', action='store_true', help='Whether to use High-Probability Filtering')
 parser.add_argument('--use_ams', action='store_true', help='Whether to use Attention-Matrix Sampling')
+parser.add_argument('--use_fed', action='store_true', help='Whether to use FED Filtering')
+parser.add_argument('--reference_file', type=str, help='Reference file for FED Filtering')
 parser.add_argument('--proteinbert', action='store_true', help='Whether to use ProteinBERT for Quantitative-Function Filtering')
 parser.add_argument('--evmutation', action='store_true', help='Whether to use EVmutation for Quantitative-Function Filtering')
 parser.add_argument('--saved_model_dir', type=str, help='ProteinBERT saved model directory')
@@ -90,7 +93,7 @@ if args.sampling_method in ['top_k', 'top_p', 'typical', 'mirostat']:
     assert args.sampling_threshold is not None, "Sampling threshold must be specified for top_k, top_p, and mirostat sampling methods"
 assert args.intermediate_threshold <= 100, "Intermediate sampling threshold cannot be greater than 100!"
 
-assert args.use_qff or args.use_hpf or args.use_ams, "Please specify at least one filter-sampling method!"
+assert args.use_qff or args.use_hpf or args.use_ams or args.use_fed, "Please specify at least one filter-sampling method!"
 if args.use_qff:
     if args.proteinbert:
         assert args.saved_model_dir is not None, "Please specify the saved model directory for Quantitative Filter!"
@@ -105,20 +108,22 @@ if args.use_qff:
         strat = "ProteinBERT"
     
     if args.evmutation:
-        ev_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"{args.evmutation_model_dir}")
+        ev_dir = os.path.join(f"{args.evmutation_model_dir}")
         assert os.path.exists(ev_dir), f"Model directory {ev_dir} does not exist"
         ev_model = CouplingsModel(ev_dir)
         strat = "EVmutation"
 
     print(f"{strat} Quantitative-Function Filter will be used!")
 if args.use_hpf:
-    assert args.intermediate_threshold is not None, "Please specify the intermediate threshold for High-Probability Filter!"
     strat = "High-Probability Filter"
     print("High-Probability Filter will be used!")
 if args.use_ams:
-    assert args.intermediate_threshold is not None, "Please specify the intermediate threshold for Attention-Matrix Sampling!"
     strat = "Attention-Matrix Sampling"
     print("Attention-Matrix Sampling will be used!")
+if args.use_fed:
+    assert args.reference_file is not None, "Please specify the reference file for FED Filter!"
+    strat = "FED Filter"
+    print("FED Filter will be used!")  
 
 while len(generated_sequence) < sequence_num:
 
@@ -148,28 +153,15 @@ while len(generated_sequence) < sequence_num:
             # First Mutation
             if mutation_count == 1:
                 # 1. Generate and score suggested mutation
-                score_heatmap, suggested_mutation, scores, single_DMS = app.score_and_create_matrix_all_singles(seq, mutation_start, mutation_end, 
+                score_heatmap, suggested_mutation, scores, _ = app.score_and_create_matrix_all_singles(seq, Tranception_model=model, 
+                                                                                            mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
                                                                                             scoring_mirror=args.use_scoring_mirror, 
                                                                                             batch_size_inference=args.batch, 
                                                                                             max_number_positions_per_heatmap=args.max_pos, 
                                                                                             num_workers=args.num_workers, 
                                                                                             AA_vocab=AA_vocab, 
                                                                                             tokenizer=tokenizer,
-                                                                                            with_heatmap=args.with_heatmap,
-                                                                                            Tranception_model=model)
-
-                last_round_DMS = single_DMS
-                # Save heatmap
-                if args.with_heatmap and args.save_scores:
-                    save_path_heatmap = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"output_heatmap_round_{mutation_count}.csv")
-                    pd.DataFrame(score_heatmap, columns =['score_heatmap']).to_csv(save_path_heatmap)
-                    print(f"Results saved to {save_path_heatmap}")
-
-                # Save scores
-                if args.save_scores:
-                    save_path_scores = os.path.join(os.path.dirname(os.path.realpath(__file__)), "output_scores.csv")
-                    scores.to_csv(save_path_scores)
-                    print(f"Scores saved to {save_path_scores}")
+                                                                                            with_heatmap=args.with_heatmap)
 
                 # 2. Define intermediate sampling threshold
                 final_sampler = temperature_sampler(args.temperature)
@@ -179,7 +171,7 @@ while len(generated_sequence) < sequence_num:
             # Subsequent Mutations
             if mutation_count > 1 and mutation_count < args.mutations:
                 # 1. Generate extra mutations
-                last_mutation_round_DMS = last_round_DMS
+                last_mutation_round_DMS = scores
                 print(f"Generating 1 extra mutations after {len(last_mutation_round_DMS['mutant'][0].split(':'))} rounds to make {mutation_count} rounds in total")
                 assert len(last_mutation_round_DMS['mutant'][0].split(':')) == mutation_count-1, "Mutation step not consistent with previous mutation round"
                 all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
@@ -187,13 +179,12 @@ while len(generated_sequence) < sequence_num:
                 # 2. Sample extra mutations
                 if args.use_qff:
                     if args.proteinbert:
-                        all_extra_mutants = all_extra_mutants.sample(n=100)
                         extra_mutants = app.predict_proteinBERT(model=proteinbert_model, DMS=all_extra_mutants,input_encoder=input_encoder, top_n=intermediate_sampling_threshold, batch_size=128)
                     if args.evmutation:
                         extra_mutants = app.predict_evmutation(DMS=all_extra_mutants, orig_seq=args.sequence.upper(), top_n=intermediate_sampling_threshold, ev_model=ev_model)
                 
                 if args.use_hpf:
-                    mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
+                    mutation = top_k_sampling(scores, k=int(10), sampler=final_sampler, multi=True)
                     trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
                     _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=trimmed,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
                                                             scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
@@ -201,8 +192,11 @@ while len(generated_sequence) < sequence_num:
                                                             AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
                     extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
                 
+                if args.use_fed:
+                    extra_mutants = app.get_FED_predictions(DMS=all_extra_mutants, reference=args.reference_file, top_n=intermediate_sampling_threshold)
+                
                 if args.use_ams:
-                    mutation = top_k_sampling(scores, k=int(10), sampler=final_sampler, multi=True)
+                    # mutation = top_k_sampling(scores, k=int(10), sampler=final_sampler, multi=True)
                     att_mutations = app.get_attention_mutants() # TODO: Get attention mutants
                     _, scored_att_mutations, att_mutations = app.score_multi_mutations(seq,extra_mutants=att_mutations,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
                                                             scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
@@ -213,24 +207,17 @@ while len(generated_sequence) < sequence_num:
                 print(f"Using {len(extra_mutants)} variants for scoring")
 
                 # 3. Get scores of sampled mutation
-                suggested_mutation, scores, extra_DMS = app.score_multi_mutations(seq,
-                                                                                extra_mutants=extra_mutants,
-                                                                                mutation_range_start=mutation_start, 
-                                                                                mutation_range_end=mutation_end, 
-                                                                                scoring_mirror=args.use_scoring_mirror, 
-                                                                                batch_size_inference=args.batch, 
-                                                                                max_number_positions_per_heatmap=args.max_pos, 
-                                                                                num_workers=args.num_workers, 
-                                                                                AA_vocab=AA_vocab, 
-                                                                                tokenizer=tokenizer,
-                                                                                Tranception_model=model)
-
-                last_round_DMS = extra_DMS
-                # Save scores
-                if args.save_scores:
-                    save_path_scores = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"output_scores_round_{mutation_count}.csv")
-                    scores.to_csv(save_path_scores)
-                    print(f"Scores saved to {save_path_scores}")
+                suggested_mutation, scores, _ = app.score_multi_mutations(seq,
+                                                                        extra_mutants=extra_mutants,
+                                                                        mutation_range_start=mutation_start, 
+                                                                        mutation_range_end=mutation_end, 
+                                                                        scoring_mirror=args.use_scoring_mirror, 
+                                                                        batch_size_inference=args.batch, 
+                                                                        max_number_positions_per_heatmap=args.max_pos, 
+                                                                        num_workers=args.num_workers, 
+                                                                        AA_vocab=AA_vocab, 
+                                                                        tokenizer=tokenizer,
+                                                                        Tranception_model=model)
 
                 # 4. Define intermediate sampling threshold
                 final_sampler = temperature_sampler(args.temperature)
@@ -240,7 +227,7 @@ while len(generated_sequence) < sequence_num:
             # Last Mutation
             if mutation_count == args.mutations:
                 # 1. Generate extra mutations
-                last_mutation_round_DMS = last_round_DMS
+                last_mutation_round_DMS = scores
                 print(f"Generating 1 extra mutations after {len(last_mutation_round_DMS['mutant'][0].split(':'))} rounds to make {mutation_count} rounds in total")
                 assert len(last_mutation_round_DMS['mutant'][0].split(':')) == mutation_count-1, "Mutation step not consistent with previous mutation round"
                 all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
@@ -248,19 +235,23 @@ while len(generated_sequence) < sequence_num:
                 # 2. Sample from extra mutations
                 if args.use_qff:
                     if args.proteinbert:
-                        all_extra_mutants = all_extra_mutants.sample(n=100)
                         extra_mutants = app.predict_proteinBERT(model=proteinbert_model, DMS=all_extra_mutants,input_encoder=input_encoder, top_n=intermediate_sampling_threshold, batch_size=128)
                     if args.evmutation:
                         extra_mutants = app.predict_evmutation(DMS=all_extra_mutants, orig_seq=args.sequence.upper(), top_n=intermediate_sampling_threshold, ev_model=ev_model)
                 
                 if args.use_hpf:
-                    mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
+                    mutation = top_k_sampling(scores, k=int(10), sampler=final_sampler, multi=True)
                     trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
                     _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=trimmed,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
                                                             scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
                                                             max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
                                                             AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
                     extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
+                    print(f'HPF: {extra_mutants}')
+                
+                if args.use_fed:
+                    extra_mutants = app.get_FED_predictions(DMS=all_extra_mutants, reference=args.reference_file, top_k=intermediate_sampling_threshold)
+                
                 
                 if args.use_ams:
                     mutation = top_k_sampling(scores, k=int(10), sampler=final_sampler, multi=True)
@@ -274,23 +265,17 @@ while len(generated_sequence) < sequence_num:
                 print(f"Using {len(extra_mutants)} variants for scoring")
 
                 # 3. Get scores of sampled mutation
-                suggested_mutation, scores, extra_DMS = app.score_multi_mutations(seq,
-                                                                                extra_mutants=extra_mutants,
-                                                                                mutation_range_start=mutation_start, 
-                                                                                mutation_range_end=mutation_end, 
-                                                                                scoring_mirror=args.use_scoring_mirror, 
-                                                                                batch_size_inference=args.batch, 
-                                                                                max_number_positions_per_heatmap=args.max_pos, 
-                                                                                num_workers=args.num_workers, 
-                                                                                AA_vocab=AA_vocab, 
-                                                                                tokenizer=tokenizer,
-                                                                                Tranception_model=model)
-
-                # Save scores
-                if args.save_scores:
-                    save_path_scores = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"output_scores_round_{mutation_count}.csv")
-                    scores.to_csv(save_path_scores)
-                    print(f"Scores saved to {save_path_scores}")
+                suggested_mutation, scores, _ = app.score_multi_mutations(seq,
+                                                                        extra_mutants=extra_mutants,
+                                                                        mutation_range_start=mutation_start, 
+                                                                        mutation_range_end=mutation_end, 
+                                                                        scoring_mirror=args.use_scoring_mirror, 
+                                                                        batch_size_inference=args.batch, 
+                                                                        max_number_positions_per_heatmap=args.max_pos, 
+                                                                        num_workers=args.num_workers, 
+                                                                        AA_vocab=AA_vocab, 
+                                                                        tokenizer=tokenizer,
+                                                                        Tranception_model=model)
 
                 # 4. Final Sampling mutation from suggested mutation scores
                 final_sampler = temperature_sampler(args.temperature)
@@ -346,7 +331,7 @@ while len(generated_sequence) < sequence_num:
     print(f"Sequence {len(generated_sequence)} of {sequence_num} generated in {generation_time} seconds using {strat} on {mutation_count} multi-mutants and {iteration} evolution cycles")
     print("=========================================")
     
-
+print(f'===========Mutated {len(generated_sequence)} sequences in {sum(generation_duration)} seconds============')
 generated_sequence_df = pd.DataFrame({'name': generated_sequence_name,'sequence': generated_sequence, 'sampling': samplings, 'threshold': samplingthreshold, 'subsampling':subsamplings, 'subthreshold': subsamplingthreshold, 'iterations': sequence_iteration, 'mutants': mutants, 'mutations': mutation_list, 'time': generation_duration})
 
 if args.save_df:

@@ -11,7 +11,8 @@ import time
 import MCTS
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--sequence', type=str, choices=["mdh_esm", "mdh_esm_2", "avGFP"], default='mdh_esm', help='Sequence to do mutation or DE')
+parser.add_argument('--sequence', type=str, help='Sequence to do mutation or DE', required=True)
+parser.add_argument('--seq_id', type=str, help='Sequence ID for mutation', required=True)
 parser.add_argument('--mutation_start', type=int, default=None, help='Mutation start position')
 parser.add_argument('--mutation_end', type=int, default=None, help='Mutation end position')
 parser.add_argument('--model', type=str, choices=['small', 'medium', 'large'], help='Tranception model size')
@@ -107,15 +108,15 @@ while len(generated_sequence) < sequence_num:
             sampling_threshold = args.max_length
         else:
             # 1. Get scores of suggested mutation
-            score_heatmap, suggested_mutation, scores, _ = app.score_and_create_matrix_all_singles(seq, mutation_start, mutation_end, 
+            score_heatmap, suggested_mutation, scores, _ = app.score_and_create_matrix_all_singles(seq, Tranception_model=model, 
+                                                                                        mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
                                                                                         scoring_mirror=args.use_scoring_mirror, 
                                                                                         batch_size_inference=args.batch, 
                                                                                         max_number_positions_per_heatmap=args.max_pos, 
                                                                                         num_workers=args.num_workers, 
                                                                                         AA_vocab=AA_vocab, 
                                                                                         tokenizer=tokenizer,
-                                                                                        with_heatmap=args.with_heatmap,
-                                                                                        Tranception_model=model)
+                                                                                        with_heatmap=args.with_heatmap)
 
             # Save heatmap
             if args.with_heatmap and args.save_scores:
@@ -182,7 +183,7 @@ while len(generated_sequence) < sequence_num:
     print(f"Sequence {len(generated_sequence)} of {sequence_num} generated in {generation_time} seconds with {iteration} evolution cycles")
     print("=========================================")
     
-
+print(f'===========Mutated {len(generated_sequence)} sequences in {sum(generation_duration)} seconds============')
 generated_sequence_df = pd.DataFrame({'name': generated_sequence_name,'sequence': generated_sequence, 'sampling': samplings, 'threshold': samplingtheshold, 'subsampling':subsamplings, 'subthreshold': subsamplingtheshold, 'iterations': sequence_iteration, 'mutants': mutants, 'mutations': mutation_list, 'time': generation_duration})
 
 if args.save_df:

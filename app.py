@@ -12,6 +12,15 @@ import os
 from tensorflow import keras
 import itertools
 import re
+import tqdm
+from scoring_metrics.util import identify_mutation, extract_mutations
+from EVmutation.model import CouplingsModel
+from EVmutation.tools import predict_mutation_table
+from sampling import top_k_sampling
+# FID
+from scoring_metrics import fid_score as fid
+import tempfile
+from pgen.utils import parse_fasta
 
 AA_vocab = "ACDEFGHIKLMNPQRSTVWY"
 tokenizer = PreTrainedTokenizerFast(tokenizer_file=os.path.join(os.path.dirname(os.path.realpath(__file__)), "tranception/utils/tokenizers/Basic_tokenizer"),
@@ -49,6 +58,7 @@ def extend_sequence_by_n(sequence, n: int, reference_vocab, output_sequence=True
     return df_ext
 
 def generate_n_extra_mutations(DMS_data: pd.DataFrame, extra_mutations: int, AA_vocab=AA_vocab, mutation_range_start=None, mutation_range_end=None):
+    # DMS_data = top_k_sampling(DMS_data, k=k, multi=True)
     variants = DMS_data
     seq = variants["mutated_sequence"][0]
     assert extra_mutations > 0, "Number of mutations must be greater than 0."
@@ -78,6 +88,7 @@ def trim_DMS(DMS_data:pd.DataFrame, sampled_mutants:pd.DataFrame, mutation_round
     else:
       DMS_data[f'current_mutation'] = DMS_data["mutant"].map(lambda x: ":".join(x.split(":", mutation_rounds-1)[mutation_rounds-1:]))
   trimmed_variants = DMS_data[DMS_data[f'past_mutation'].isin(sampled_mutants['mutant'])].reset_index(drop=True)
+  print(f'Trimmed DMS: {len(trimmed_variants)}')
   return trimmed_variants[['mutant','mutated_sequence']]
 
 def create_scoring_matrix_visual(scores,sequence,image_index=0,mutation_range_start=None,mutation_range_end=None,AA_vocab=AA_vocab,annotate=True,fontsize=20):
@@ -321,16 +332,10 @@ def predict_evmutation(DMS, orig_seq, top_n, ev_model):
   # c = CouplingsModel(model_params)
   c = ev_model
   e_result = []
-  # Load targets
-  targets = DMS['mutated_sequence']
-  for i, row in targets.iterrows():
-    target = row['mutated_sequence']
-    mutations = identify_mutation(orig_seq, target)
-    extract = extract_mutations(mutations)
-    delta_E, delta_E_couplings, delta_E_fields = c.delta_hamiltonian(extract)
-    e_result.append(delta_E)
-  DMS['EVmutation'] = e_result
+  print("===Predicting EVmutation===")
+  DMS = predict_mutation_table(c, DMS, output_column="EVmutation")
   DMS = DMS.sort_values(by = 'EVmutation', ascending = False, ignore_index = True)
+  print("===Predicting EVmutation Done===")
   return DMS.head(top_n)[['mutated_sequence', 'mutant']]
 
 def get_attention_mutants(sequence:str, extra_mutants:pd.DataFrame, mutation_range_start=None,mutation_range_end=None,scoring_mirror=False,batch_size_inference=20,max_number_positions_per_heatmap=50,num_workers=0,AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=False, Tranception_model="./Tranception"):
@@ -379,3 +384,26 @@ def process_prompt_protxlnet(s):
   # s = s.replace('?', '[MASK]')
   s = re.sub(r"[UZOB]", "<unk>", s)
   return s
+
+def get_FED_predictions(DMS, reference, top_k):
+  FED_score = []
+  with tempfile.TemporaryDirectory() as od:
+    ref_file = od + "/ref_file.fasta"
+    with open(ref_file, "w") as f:
+      for name, seq in zip(*parse_fasta(reference, return_names=True, clean="unalign")):
+        print(f">{name}\n{seq}", file=f)
+    # Run FED
+    for seq in tqdm.tqdm(DMS, total=len(DMS)):
+      with tempfile.TemporaryDirectory() as output_dir:
+        seq_file = output_dir + "/seq_file.tsv"
+        with open(seq_file, "w") as fh:
+          print(f">TARGET\n{seq}", file=fh)
+        
+        # Score
+        score = fid.calculate_fid_given_paths(seq_file, ref_file)
+        FED_score.append(score)
+  
+  DMS['FED'] = FED_score
+  DMS = DMS.sort_values(by = 'FED', ascending = False, ignore_index = True)
+  return DMS.head(top_k)
+

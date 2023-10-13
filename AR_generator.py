@@ -178,7 +178,7 @@ while len(generated_sequence) < sequence_num:
     print(f"Sequence {len(generated_sequence)} of {sequence_num} generated in {generation_time} seconds")
     print("=========================================")
     
-
+print(f'===========Generated {len(generated_sequence)} sequences of length {seq_length} in {sum(generation_duration)} seconds============')
 generated_sequence_df = pd.DataFrame({'name': generated_sequence_name,'sequence': generated_sequence, 'sampling': samplings, 'threshold': samplingtheshold, 'subsampling':subsamplings, 'subthreshold': subsamplingtheshold, 'iterations': sequence_iteration, 'mutants': mutants, 'mutations': mutation_list, 'time': generation_duration})
 
 if args.save_df:

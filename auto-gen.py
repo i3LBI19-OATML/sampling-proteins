@@ -92,7 +92,7 @@ for idx in range(args.num_samples):
         error_surprise = 0
         running_tot_surprise = 0
         learning_rate = 1
-        num_tokens = des_seq_len
+        num_tokens = des_seq_len*2
         n=tokenizer.vocab_size if args.model_type == 'ProtXLNet' else len(tokenizer.vocab)
 
         # file_string = args.context
