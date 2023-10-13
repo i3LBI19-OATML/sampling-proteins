@@ -93,7 +93,8 @@ def trim_DMS(DMS_data:pd.DataFrame, sampled_mutants:pd.DataFrame, mutation_round
     else:
       DMS_data[f'current_mutation'] = DMS_data["mutant"].map(lambda x: ":".join(x.split(":", mutation_rounds-1)[mutation_rounds-1:]))
   trimmed_variants = DMS_data[DMS_data[f'past_mutation'].isin(sampled_mutants['mutant'])].reset_index(drop=True)
-  print(f'Trimmed DMS: {len(trimmed_variants)}')
+  # print(f'Trimmed DMS: {len(trimmed_variants)}')
+  trimmed_variants = trimmed_variants.drop_duplicates(subset=['mutant']).reset_index(drop=True)
   return trimmed_variants[['mutant','mutated_sequence']]
 
 def create_scoring_matrix_visual(scores,sequence,image_index=0,mutation_range_start=None,mutation_range_end=None,AA_vocab=AA_vocab,annotate=True,fontsize=20):
@@ -301,6 +302,7 @@ def score_multi_mutations(sequence:str, extra_mutants:pd.DataFrame, Tranception_
   scores = pd.merge(scores,extra_mutants,on="mutated_sequence",how="left")
   # scores["position"]=scores["mutant"].map(lambda x: int(x[1:-1]))
   # scores["target_AA"] = scores["mutant"].map(lambda x: x[-1])
+  # print(f'score col: {scores.columns}')
   if AR_mode:
     return scores, extra_mutants
   else:

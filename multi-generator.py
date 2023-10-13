@@ -184,7 +184,7 @@ while len(generated_sequence) < sequence_num:
                     #                                         scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
                     #                                         max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
                     #                                         AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
-                    # extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
+                    # extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)[['mutant', 'mutated_sequence']]
                     extra_mutants = trimmed.sample(n=intermediate_sampling_threshold)
 
                                 
@@ -239,11 +239,9 @@ while len(generated_sequence) < sequence_num:
                     #                                         scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
                     #                                         max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
                     #                                         AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
-                    # extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
-                    print(f'trimmed: {trimmed.columns}')
+                    # extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)[['mutant', 'mutated_sequence']]
                     extra_mutants = trimmed.sample(n=intermediate_sampling_threshold)
-                    print(f'HPF final: {extra_mutants.columns}')
-                                
+
                 if args.use_ams:
                     mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
                     att_mutations = app.get_attention_mutants() # TODO: Get attention mutants

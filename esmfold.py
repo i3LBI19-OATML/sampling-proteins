@@ -12,6 +12,7 @@ from glob import glob
 import pandas as pd
 from pgen.utils import parse_fasta
 import argparse
+import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", type=str, required=True, help="Directory to save results")
@@ -72,6 +73,7 @@ model.eval().cuda().requires_grad_(False)
 model_name_ = model_name
 
 for _, row in tqdm.tqdm(data_df.iterrows(), total=len(data_df)):
+  start_time = time.time()
   jobname = row['name']
   jobname = re.sub(r'\W+', '', jobname)[:50]
 
@@ -127,6 +129,7 @@ for _, row in tqdm.tqdm(data_df.iterrows(), total=len(data_df)):
 
   id_list.append(ID.split('/')[-1])
   plddt_list.append(plddt)
+  end_time = time.time() - start_time
 
   O = parse_output(output)
 
@@ -143,7 +146,7 @@ for _, row in tqdm.tqdm(data_df.iterrows(), total=len(data_df)):
   tmscore = tmscoring.get_tm(reference_pdb, pdb_file)
   tm_list.append(tmscore)
 
-  # print(f'ptm: {ptm:.3f} plddt: {plddt:.3f} tmscore: {tmscore:.3f}')
+  print(f'ptm: {ptm:.3f} plddt: {plddt:.3f} tmscore: {tmscore:.3f} time: {end_time:.3f}')
 
 results_df = pd.DataFrame(list(zip(id_list, plddt_list, tm_list)), columns = ["seq_name", "plddt", "tm_score"])
 if path_prefix is not None:
