@@ -334,7 +334,7 @@ def load_savedmodel(model_path):
   model = keras.models.load_model(model_path)
   return model
 
-def predict_evmutation(DMS, orig_seq, top_n, ev_model):
+def predict_evmutation(DMS, orig_seq, top_n, ev_model, return_evscore=False):
   # Load Model
   # c = CouplingsModel(model_params)
   c = ev_model
@@ -343,7 +343,10 @@ def predict_evmutation(DMS, orig_seq, top_n, ev_model):
   DMS = predict_mutation_table(c, DMS, output_column="EVmutation")
   DMS = DMS.sort_values(by = 'EVmutation', ascending = False, ignore_index = True)
   print("===Predicting EVmutation Done===")
-  return DMS.head(top_n)[['mutated_sequence', 'mutant']]
+  if return_evscore:
+    return DMS.head(top_n)[['mutated_sequence', 'mutant', 'EVmutation']]
+  else:
+    return DMS.head(top_n)[['mutated_sequence', 'mutant']]
 
 def get_attention_mutants(sequence:str, extra_mutants:pd.DataFrame, mutation_range_start=None,mutation_range_end=None,scoring_mirror=False,batch_size_inference=20,max_number_positions_per_heatmap=50,num_workers=0,AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=False, Tranception_model="./Tranception"):
   raise NotImplementedError
@@ -391,4 +394,13 @@ def process_prompt_protxlnet(s):
   # s = s.replace('?', '[MASK]')
   s = re.sub(r"[UZOB]", "<unk>", s)
   return s
+
+def stratified_filtering(DMS, threshold, column_name):
+  DMS['strata'] = pd.qcut(DMS[column_name], q=4, labels=['very low', 'low', 'high', 'very high'])
+  if threshold >= 4:
+    threshold = threshold // 4
+  elif threshold < 4:
+    threshold = 1
+  DMS = DMS.groupby('strata', group_keys=False).apply(lambda x: x.sample(threshold))
+  return DMS[['mutant', 'mutated_sequence']].reset_index(drop=True)
 

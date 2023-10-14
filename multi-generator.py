@@ -32,6 +32,7 @@ parser.add_argument('--sampling_threshold', type=float, help='Sampling threshold
 parser.add_argument('--intermediate_threshold', type=int, required=True, help='Top-K threshold for intermediate sampling')
 parser.add_argument('--use_qff', action='store_true', help='Whether to use Quantitative-Function Filtering')
 parser.add_argument('--use_hpf', action='store_true', help='Whether to use High-Probability Filtering')
+parser.add_argument('--use_rsf', action='store_true', help='Whether to use Random-Stratified Filtering')
 parser.add_argument('--use_ams', action='store_true', help='Whether to use Attention-Matrix Sampling')
 parser.add_argument('--proteinbert', action='store_true', help='Whether to use ProteinBERT for Quantitative-Function Filtering')
 parser.add_argument('--evmutation', action='store_true', help='Whether to use EVmutation for Quantitative-Function Filtering')
@@ -91,7 +92,7 @@ if args.sampling_method in ['top_k', 'top_p', 'typical', 'mirostat']:
     assert args.sampling_threshold is not None, "Sampling threshold must be specified for top_k, top_p, and mirostat sampling methods"
 assert args.intermediate_threshold <= 100, "Intermediate sampling threshold cannot be greater than 100!"
 
-assert args.use_qff or args.use_hpf or args.use_ams, "Please specify at least one filter-sampling method!"
+assert args.use_qff or args.use_hpf or args.use_ams or args.use_rsf, "Please specify at least one filter-sampling method!"
 if args.use_qff:
     if args.proteinbert:
         assert args.saved_model_dir is not None, "Please specify the saved model directory for Quantitative Filter!"
@@ -118,6 +119,9 @@ if args.use_hpf:
 if args.use_ams:
     strat = "Attention-Matrix Sampling"
     print("Attention-Matrix Sampling will be used!")
+if args.use_rsf:
+    strat = "Random-Stratified Filter"
+    print("Random-Stratified Filter will be used!")
 
 while len(generated_sequence) < sequence_num:
 
@@ -186,7 +190,10 @@ while len(generated_sequence) < sequence_num:
                     #                                         AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
                     # extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)[['mutant', 'mutated_sequence']]
                     extra_mutants = trimmed.sample(n=intermediate_sampling_threshold)
-
+                
+                if args.use_rsf:
+                    ev_scored = app.predict_evmutation(DMS=all_extra_mutants, orig_seq=args.sequence.upper(), top_n=len(all_extra_mutants), ev_model=ev_model, return_evscore=True)
+                    extra_mutants = app.stratified_filtering(ev_scored, threshold=intermediate_sampling_threshold, column_name='EVmutation')
                                 
                 if args.use_ams:
                     mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
@@ -241,6 +248,10 @@ while len(generated_sequence) < sequence_num:
                     #                                         AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
                     # extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)[['mutant', 'mutated_sequence']]
                     extra_mutants = trimmed.sample(n=intermediate_sampling_threshold)
+
+                if args.use_rsf:
+                    ev_scored = app.predict_evmutation(DMS=all_extra_mutants, orig_seq=args.sequence.upper(), top_n=len(all_extra_mutants), ev_model=ev_model, return_evscore=True)
+                    extra_mutants = app.stratified_filtering(ev_scored, threshold=intermediate_sampling_threshold, column_name='EVmutation')
 
                 if args.use_ams:
                     mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
