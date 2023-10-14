@@ -334,7 +334,7 @@ def load_savedmodel(model_path):
   model = keras.models.load_model(model_path)
   return model
 
-def predict_evmutation(DMS, orig_seq, top_n, ev_model, return_evscore=False):
+def predict_evmutation(DMS, top_n, ev_model, return_evscore=False):
   # Load Model
   # c = CouplingsModel(model_params)
   c = ev_model
@@ -348,28 +348,50 @@ def predict_evmutation(DMS, orig_seq, top_n, ev_model, return_evscore=False):
   else:
     return DMS.head(top_n)[['mutated_sequence', 'mutant']]
 
-def get_attention_mutants(sequence:str, extra_mutants:pd.DataFrame, mutation_range_start=None,mutation_range_end=None,scoring_mirror=False,batch_size_inference=20,max_number_positions_per_heatmap=50,num_workers=0,AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=False, Tranception_model="./Tranception"):
-  raise NotImplementedError
+def get_all_possible_mutations_at_pos(sequence: str, position: int, or_mutant=None, return_dict=False, AA_vocab=AA_vocab):
+    assert position >= 0 and position < len(sequence), "Invalid position"
+    mutations = []
+    for aa in AA_vocab:
+        if aa != sequence[position]:
+            new_sequence = sequence[:position] + aa + sequence[position+1:]
+            if or_mutant:
+              mutant_code = f"{or_mutant}:{sequence[position]}{position+1}{aa}"
+            else:
+              mutant_code = f"{sequence[position]}{position+1}{aa}"
+            mutations.append({"mutated_sequence": new_sequence, "mutant": mutant_code})
+    if return_dict:
+      return mutations
+    else:
+      return pd.DataFrame(mutations)
 
-  if sequence is not None:
-    if mutation_range_start is None: mutation_range_start=1
-    if mutation_range_end is None: mutation_range_end=len(sequence)
-    assert mutation_range_start <= mutation_range_end, "mutation range is invalid"
-  if torch.cuda.is_available():
-    model.cuda()
-    print("Inference will take place on GPU")
-  else:
-    print("Inference will take place on CPU")
-  model.config.tokenizer = tokenizer
-  scores = model.score_mutants(DMS_data=extra_mutants, 
-                                    target_seq=sequence, 
-                                    scoring_mirror=scoring_mirror, 
-                                    batch_size_inference=batch_size_inference,  
-                                    num_workers=num_workers, 
-                                    indel_mode=False
-                                    )
-  print("Scoring done")
-  scores = pd.merge(scores,extra_mutants,on="mutated_sequence",how="left")
+def get_attention_mutants(DMS, Tranception_model, focus='highest', top_n = 5, AA_vocab=AA_vocab, tokenizer=tokenizer):
+  # raise NotImplementedError
+
+  new_mutations = []
+  for idx, row in tqdm.tqdm(DMS.iterrows(), total=len(DMS)):
+    sequence = row['mutated_sequence']
+    mutant = row['mutant']
+
+    # Get attention scores
+    inputs = torch.tensor([tokenizer.encode(sequence)]).to("cuda")
+    attention_scores = Tranception_model(input_ids=context, return_dict=True).attentions
+    attention_scores = torch.stack(attention_scores).squeeze(1).cpu().detach().numpy()
+
+    if focus == 'highest':
+      ind = np.argpartition(a, -top_n)[-top_n:]
+    elif focus == 'lowest':
+      ind = np.argpartition(a, top_n)[:top_n]
+    else:
+      raise ValueError('Invalid focus value')
+    
+    # Mutate sequence at positions with highest attention scores
+    for pos in ind:
+      dict_pos = get_all_possible_mutations_at_pos(sequence, pos, or_mutant=mutant, return_dict=True)
+      new_mutations.extend(dict_pos)
+  
+  new_mutations = pd.DataFrame(new_mutations)
+  new_mutations = new_mutations.drop_duplicates(subset=['mutant']).reset_index(drop=True)
+  return new_mutations[['mutant','mutated_sequence']]
 
   
 def split_mask(s):
@@ -395,8 +417,8 @@ def process_prompt_protxlnet(s):
   s = re.sub(r"[UZOB]", "<unk>", s)
   return s
 
-def stratified_filtering(DMS, threshold, column_name):
-  DMS['strata'] = pd.qcut(DMS[column_name], q=4, labels=['very low', 'low', 'high', 'very high'])
+def stratified_filtering(DMS, threshold, column_name='EVmutation'):
+  DMS['strata'] = pd.qcut(DMS[str(column_name)], q=4, labels=['very low', 'low', 'high', 'very high'])
   if threshold >= 4:
     threshold = threshold // 4
   elif threshold < 4:

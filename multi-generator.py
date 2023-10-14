@@ -117,9 +117,15 @@ if args.use_hpf:
     strat = "High-Probability Filter"
     print("High-Probability Filter will be used!")
 if args.use_ams:
+    ev_dir = os.path.join(f"{args.evmutation_model_dir}")
+    assert os.path.exists(ev_dir), f"Model directory {ev_dir} does not exist"
+    ev_model = CouplingsModel(ev_dir)
     strat = "Attention-Matrix Sampling"
     print("Attention-Matrix Sampling will be used!")
 if args.use_rsf:
+    ev_dir = os.path.join(f"{args.evmutation_model_dir}")
+    assert os.path.exists(ev_dir), f"Model directory {ev_dir} does not exist"
+    ev_model = CouplingsModel(ev_dir)
     strat = "Random-Stratified Filter"
     print("Random-Stratified Filter will be used!")
 
@@ -172,16 +178,17 @@ while len(generated_sequence) < sequence_num:
                 last_mutation_round_DMS = scores
                 print(f"Generating 1 extra mutations after {len(last_mutation_round_DMS['mutant'][0].split(':'))} rounds to make {mutation_count} rounds in total")
                 assert len(last_mutation_round_DMS['mutant'][0].split(':')) == mutation_count-1, "Mutation step not consistent with previous mutation round"
-                all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
                 
                 # 2. Sample extra mutations
                 if args.use_qff:
+                    all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
                     if args.proteinbert:
                         extra_mutants = app.predict_proteinBERT(model=proteinbert_model, DMS=all_extra_mutants,input_encoder=input_encoder, top_n=intermediate_sampling_threshold, batch_size=128)
                     if args.evmutation:
-                        extra_mutants = app.predict_evmutation(DMS=all_extra_mutants, orig_seq=args.sequence.upper(), top_n=intermediate_sampling_threshold, ev_model=ev_model)
+                        extra_mutants = app.predict_evmutation(DMS=all_extra_mutants, top_n=intermediate_sampling_threshold, ev_model=ev_model)
                 
                 if args.use_hpf:
+                    all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
                     mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
                     trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
                     # _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=trimmed,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
@@ -192,17 +199,14 @@ while len(generated_sequence) < sequence_num:
                     extra_mutants = trimmed.sample(n=intermediate_sampling_threshold)
                 
                 if args.use_rsf:
-                    ev_scored = app.predict_evmutation(DMS=all_extra_mutants, orig_seq=args.sequence.upper(), top_n=len(all_extra_mutants), ev_model=ev_model, return_evscore=True)
+                    all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
+                    ev_scored = app.predict_evmutation(DMS=all_extra_mutants, top_n=len(all_extra_mutants), ev_model=ev_model, return_evscore=True)
                     extra_mutants = app.stratified_filtering(ev_scored, threshold=intermediate_sampling_threshold, column_name='EVmutation')
                                 
                 if args.use_ams:
                     mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
-                    att_mutations = app.get_attention_mutants() # TODO: Get attention mutants
-                    _, scored_att_mutations, att_mutations = app.score_multi_mutations(seq,extra_mutants=att_mutations,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
-                                                            scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
-                                                            max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
-                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
-                    extra_mutants = top_k_sampling(scored_att_mutations, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
+                    att_mutations = app.get_attention_mutants(DMS=mutation, Tranception_model=model, focus='highest', top_n=5) #top_n is the number of attention positions to focus on
+                    extra_mutants = app.predict_evmutation(DMS=att_mutations, top_n=intermediate_sampling_threshold, ev_model=ev_model)
                 
                 print(f"Using {len(extra_mutants)} variants for scoring")
 
@@ -230,16 +234,16 @@ while len(generated_sequence) < sequence_num:
                 last_mutation_round_DMS = scores
                 print(f"Generating 1 extra mutations after {len(last_mutation_round_DMS['mutant'][0].split(':'))} rounds to make {mutation_count} rounds in total")
                 assert len(last_mutation_round_DMS['mutant'][0].split(':')) == mutation_count-1, "Mutation step not consistent with previous mutation round"
-                all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
-
                 # 2. Sample from extra mutations
                 if args.use_qff:
+                    all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
                     if args.proteinbert:
                         extra_mutants = app.predict_proteinBERT(model=proteinbert_model, DMS=all_extra_mutants,input_encoder=input_encoder, top_n=intermediate_sampling_threshold, batch_size=128)
                     if args.evmutation:
-                        extra_mutants = app.predict_evmutation(DMS=all_extra_mutants, orig_seq=args.sequence.upper(), top_n=intermediate_sampling_threshold, ev_model=ev_model)
+                        extra_mutants = app.predict_evmutation(DMS=all_extra_mutants, top_n=intermediate_sampling_threshold, ev_model=ev_model)
                 
                 if args.use_hpf:
+                    all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
                     mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
                     trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
                     # _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=trimmed,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
@@ -250,17 +254,14 @@ while len(generated_sequence) < sequence_num:
                     extra_mutants = trimmed.sample(n=intermediate_sampling_threshold)
 
                 if args.use_rsf:
-                    ev_scored = app.predict_evmutation(DMS=all_extra_mutants, orig_seq=args.sequence.upper(), top_n=len(all_extra_mutants), ev_model=ev_model, return_evscore=True)
+                    all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
+                    ev_scored = app.predict_evmutation(DMS=all_extra_mutants, top_n=len(all_extra_mutants), ev_model=ev_model, return_evscore=True)
                     extra_mutants = app.stratified_filtering(ev_scored, threshold=intermediate_sampling_threshold, column_name='EVmutation')
 
                 if args.use_ams:
                     mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
-                    att_mutations = app.get_attention_mutants() # TODO: Get attention mutants
-                    _, scored_att_mutations, att_mutations = app.score_multi_mutations(seq,extra_mutants=att_mutations,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
-                                                            scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
-                                                            max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
-                                                            AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
-                    extra_mutants = top_k_sampling(scored_att_mutations, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)
+                    att_mutations = app.get_attention_mutants(DMS=mutation, Tranception_model=model, focus='highest', top_n=5) #top_n is the number of attention positions to focus on
+                    extra_mutants = app.predict_evmutation(DMS=att_mutations, top_n=intermediate_sampling_threshold, ev_model=ev_model)
                 
                 print(f"Using {len(extra_mutants)} variants for scoring")
 
