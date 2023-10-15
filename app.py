@@ -369,13 +369,11 @@ def get_all_possible_mutations_at_pos(sequence: str, position: int, or_mutant=No
 
 def get_attention_mutants(DMS, Tranception_model, focus='highest', top_n = 5, AA_vocab=AA_vocab, tokenizer=tokenizer):
   # raise NotImplementedError
-
-  inputs = torch.tensor([tokenizer.encode(DMS['mutated_sequence'].tolist())]).to("cuda")
-  print(f'inputs: {inputs.shape}')
+  os.environ["TOKENIZERS_PARALLELISM"] = "false"
   new_mutations = []
-  for mutant, sequence in tqdm.tqdm(zip(DMS['mutant'], inputs), total=len(DMS)):
-    # sequence = row['mutated_sequence']
-    # mutant = row['mutant']
+  for idx, row in tqdm.tqdm(DMS.iterrows(), total=len(DMS)):
+    sequence = row['mutated_sequence']
+    mutant = row['mutant']
 
     # Get attention scores
     inputs = torch.tensor([tokenizer.encode(sequence)]).to("cuda")

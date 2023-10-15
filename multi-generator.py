@@ -255,9 +255,9 @@ while len(generated_sequence) < sequence_num:
 
                 if args.use_rsf:
                     all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
-                    print(f'col: {all_extra_mutants.columns}\nall extra: {all_extra_mutants}')
+                    # print(f'col: {all_extra_mutants.columns}\nall extra: {all_extra_mutants}')
                     ev_scored = app.predict_evmutation(DMS=all_extra_mutants, top_n=len(all_extra_mutants), ev_model=ev_model, return_evscore=True)
-                    print(f'ev_scored col: {ev_scored.columns}\nev_scored: {ev_scored}')
+                    # print(f'ev_scored col: {ev_scored.columns}\nev_scored: {ev_scored}')
                     extra_mutants = app.stratified_filtering(ev_scored, threshold=intermediate_sampling_threshold, column_name='EVmutation')
 
                 if args.use_ams:
