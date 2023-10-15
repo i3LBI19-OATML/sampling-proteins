@@ -338,15 +338,18 @@ def predict_evmutation(DMS, top_n, ev_model, return_evscore=False):
   # Load Model
   # c = CouplingsModel(model_params)
   c = ev_model
-  e_result = []
   print("===Predicting EVmutation===")
+  DMS['mutant'] = DMS['mutant'].str.replace(':', ',')
+  # print(f'ev predict table: {DMS}')
   DMS = predict_mutation_table(c, DMS, output_column="EVmutation")
   DMS = DMS.sort_values(by = 'EVmutation', ascending = False, ignore_index = True)
+  # print(f'ev result table: {DMS}')
   print("===Predicting EVmutation Done===")
+  DMS['mutant'] = DMS['mutant'].str.replace(',', ':')
   if return_evscore:
-    return DMS.head(top_n)[['mutated_sequence', 'mutant', 'EVmutation']]
+    return DMS[['mutated_sequence', 'mutant', 'EVmutation']].head(top_n)
   else:
-    return DMS.head(top_n)[['mutated_sequence', 'mutant']]
+    return DMS[['mutated_sequence', 'mutant']].head(top_n)
 
 def get_all_possible_mutations_at_pos(sequence: str, position: int, or_mutant=None, return_dict=False, AA_vocab=AA_vocab):
     assert position >= 0 and position < len(sequence), "Invalid position"
@@ -367,20 +370,23 @@ def get_all_possible_mutations_at_pos(sequence: str, position: int, or_mutant=No
 def get_attention_mutants(DMS, Tranception_model, focus='highest', top_n = 5, AA_vocab=AA_vocab, tokenizer=tokenizer):
   # raise NotImplementedError
 
+  inputs = torch.tensor([tokenizer.encode(DMS['mutated_sequence'].tolist())]).to("cuda")
+  print(f'inputs: {inputs.shape}')
   new_mutations = []
-  for idx, row in tqdm.tqdm(DMS.iterrows(), total=len(DMS)):
-    sequence = row['mutated_sequence']
-    mutant = row['mutant']
+  for mutant, sequence in tqdm.tqdm(zip(DMS['mutant'], inputs), total=len(DMS)):
+    # sequence = row['mutated_sequence']
+    # mutant = row['mutant']
 
     # Get attention scores
     inputs = torch.tensor([tokenizer.encode(sequence)]).to("cuda")
-    attention_scores = Tranception_model(input_ids=context, return_dict=True).attentions
-    attention_scores = torch.stack(attention_scores).squeeze(1).cpu().detach().numpy()
+    attention_weights = Tranception_model(input_ids=inputs, return_dict=True, output_attentions=True).attentions
+    # print(f'as: {attention_scores}')
+    attention_scores = attention_weights[-1][0].mean(dim=(0, 1))[1:-1].tolist()
 
     if focus == 'highest':
-      ind = np.argpartition(a, -top_n)[-top_n:]
+      ind = np.argpartition(attention_scores, -top_n)[-top_n:]
     elif focus == 'lowest':
-      ind = np.argpartition(a, top_n)[:top_n]
+      ind = np.argpartition(attention_scores, top_n)[:top_n]
     else:
       raise ValueError('Invalid focus value')
     
@@ -418,11 +424,11 @@ def process_prompt_protxlnet(s):
   return s
 
 def stratified_filtering(DMS, threshold, column_name='EVmutation'):
-  DMS['strata'] = pd.qcut(DMS[str(column_name)], q=4, labels=['very low', 'low', 'high', 'very high'])
+  DMS['strata'] = pd.qcut(DMS[column_name], q=4, labels=['very low', 'low', 'high', 'very high'])
   if threshold >= 4:
     threshold = threshold // 4
   elif threshold < 4:
     threshold = 1
-  DMS = DMS.groupby('strata', group_keys=False).apply(lambda x: x.sample(threshold))
-  return DMS[['mutant', 'mutated_sequence']].reset_index(drop=True)
+  filtered = DMS.groupby('strata', group_keys=False).apply(lambda x: x.sample(threshold))
+  return filtered[['mutant', 'mutated_sequence']].reset_index(drop=True)
 
