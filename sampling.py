@@ -159,14 +159,14 @@ def random_sampling(scores: pd.DataFrame, sampler = temperature_sampler(temperat
     return scores['mutant'][sampled_score]
 
 
-def beam_search(scores: pd.DataFrame, extra: int, beam_width: int, max_length:int, tokenizer, Tmodel, score_mirror=False, batch=20, max_pos=50, sampler=temperature_sampler(temperature=1.0), multi=False):
+def beam_search(scores: pd.DataFrame, beam_width: int, max_length:int, tokenizer, Tmodel, score_mirror=False, batch=20, max_pos=50, sampler=temperature_sampler(temperature=1.0), multi=False):
   length = 1
   while length < max_length:
     # Get top k mutations
     assert beam_width <= len(scores), "Beam width must be less than or equal to the number of mutations ({}).".format(len(scores))
     scores = top_k_sampling(scores, k=beam_width, sampler=sampler, multi=True)
     # Extend each mutation by one
-    levels = app.generate_n_extra_mutations(scores, extra, AA_vocab)
+    levels = app.apply_gen_1extra(scores)
     # levels = pd.DataFrame(columns=['mutated_sequence'])
     # for i, row in scores.iterrows():
     #   extension = app.extend_sequence_by_n(row['mutated_sequence'], 1, AA_vocab, output_sequence=True)

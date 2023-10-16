@@ -138,7 +138,7 @@ while len(generated_sequence) < sequence_num:
             if sampling_strat == 'top_k':
                 mutation = top_k_sampling(scores, k=int(sampling_threshold), sampler=final_sampler)
             elif sampling_strat == 'beam_search':
-                mutation = beam_search(scores, extra=1, beam_width=int(sampling_threshold), max_length=args.max_length, tokenizer=tokenizer, sampler=final_sampler, Tmodel=model)
+                mutation = beam_search(scores, beam_width=int(sampling_threshold), max_length=args.max_length, tokenizer=tokenizer, sampler=final_sampler, Tmodel=model)
             elif sampling_strat == 'top_p':
                 assert float(sampling_threshold) <= 1.0 and float(sampling_threshold) > 0, "Top-p sampling threshold must be between 0 and 1"
                 mutation = top_p_sampling(scores, p=float(sampling_threshold), sampler=final_sampler)
