@@ -181,14 +181,14 @@ while len(generated_sequence) < sequence_num:
                 
                 # 2. Sample extra mutations
                 if args.use_qff:
-                    all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
+                    all_extra_mutants = app.apply_gen_1extra(DMS=last_mutation_round_DMS)
                     if args.proteinbert:
                         extra_mutants = app.predict_proteinBERT(model=proteinbert_model, DMS=all_extra_mutants,input_encoder=input_encoder, top_n=intermediate_sampling_threshold, batch_size=128)
                     if args.evmutation:
                         extra_mutants = app.predict_evmutation(DMS=all_extra_mutants, top_n=intermediate_sampling_threshold, ev_model=ev_model)
                 
                 if args.use_hpf:
-                    all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
+                    all_extra_mutants = app.apply_gen_1extra(DMS=last_mutation_round_DMS)
                     mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
                     trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
                     # _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=trimmed,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
@@ -199,7 +199,7 @@ while len(generated_sequence) < sequence_num:
                     extra_mutants = trimmed.sample(n=intermediate_sampling_threshold)
                 
                 if args.use_rsf:
-                    all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
+                    all_extra_mutants = app.apply_gen_1extra(DMS=last_mutation_round_DMS)
                     ev_scored = app.predict_evmutation(DMS=all_extra_mutants, top_n=len(all_extra_mutants), ev_model=ev_model, return_evscore=True)
                     extra_mutants = app.stratified_filtering(ev_scored, threshold=intermediate_sampling_threshold, column_name='EVmutation')
                                 
@@ -236,14 +236,14 @@ while len(generated_sequence) < sequence_num:
                 assert len(last_mutation_round_DMS['mutant'][0].split(':')) == mutation_count-1, "Mutation step not consistent with previous mutation round"
                 # 2. Sample from extra mutations
                 if args.use_qff:
-                    all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
+                    all_extra_mutants = app.apply_gen_1extra(DMS=last_mutation_round_DMS)
                     if args.proteinbert:
                         extra_mutants = app.predict_proteinBERT(model=proteinbert_model, DMS=all_extra_mutants,input_encoder=input_encoder, top_n=intermediate_sampling_threshold, batch_size=128)
                     if args.evmutation:
                         extra_mutants = app.predict_evmutation(DMS=all_extra_mutants, top_n=intermediate_sampling_threshold, ev_model=ev_model)
                 
                 if args.use_hpf:
-                    all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
+                    all_extra_mutants = app.apply_gen_1extra(DMS=last_mutation_round_DMS)
                     mutation = top_k_sampling(scores, k=int(100), sampler=final_sampler, multi=True)
                     trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
                     # _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=trimmed,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
@@ -254,7 +254,7 @@ while len(generated_sequence) < sequence_num:
                     extra_mutants = trimmed.sample(n=intermediate_sampling_threshold)
 
                 if args.use_rsf:
-                    all_extra_mutants = app.generate_n_extra_mutations(DMS_data=last_mutation_round_DMS, extra_mutations=1)
+                    all_extra_mutants = app.apply_gen_1extra(DMS=last_mutation_round_DMS)
                     # print(f'col: {all_extra_mutants.columns}\nall extra: {all_extra_mutants}')
                     ev_scored = app.predict_evmutation(DMS=all_extra_mutants, top_n=len(all_extra_mutants), ev_model=ev_model, return_evscore=True)
                     # print(f'ev_scored col: {ev_scored.columns}\nev_scored: {ev_scored}')

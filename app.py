@@ -63,28 +63,28 @@ def extend_sequence_by_n(sequence, n: int, reference_vocab, output_sequence=True
     df_ext = pd.DataFrame.from_dict({"extension": permut})
     return df_ext
 
-def generate_n_extra_mutations(DMS_data: pd.DataFrame, extra_mutations: int, AA_vocab=AA_vocab, mutation_range_start=None, mutation_range_end=None):
-    variants = DMS_data
-    seq = variants["mutated_sequence"][0]
-    assert extra_mutations > 0, "Number of mutations must be greater than 0."
-    if mutation_range_start is None: mutation_range_start=1
-    if mutation_range_end is None: mutation_range_end=len(seq)
-    count = 0
-    while count < extra_mutations:
-        print(f"Creating extra mutation {count+1}")
-        new_variants = []
-        for index, variant in variants.iterrows():
-            for i in range(mutation_range_start-1, mutation_range_end):
-                for aa in AA_vocab:
-                    if aa != variant["mutated_sequence"][i]:
-                        new_variant = {
-                            "mutated_sequence": variant["mutated_sequence"][:i] + aa + variant["mutated_sequence"][i+1:],
-                            "mutant": variant["mutant"] + f":{variant['mutated_sequence'][i]}{i+1}{aa}"
-                        }
-                        new_variants.append(new_variant)
-        count += 1
-        variants = pd.DataFrame(new_variants)
-    return variants[['mutant','mutated_sequence']]
+# def generate_n_extra_mutations(DMS_data: pd.DataFrame, extra_mutations: int, AA_vocab=AA_vocab, mutation_range_start=None, mutation_range_end=None):
+#     variants = DMS_data
+#     seq = variants["mutated_sequence"][0]
+#     assert extra_mutations > 0, "Number of mutations must be greater than 0."
+#     if mutation_range_start is None: mutation_range_start=1
+#     if mutation_range_end is None: mutation_range_end=len(seq)
+#     count = 0
+#     while count < extra_mutations:
+#         print(f"Creating extra mutation {count+1}")
+#         new_variants = []
+#         for index, variant in tqdm.tqdm(variants.iterrows(), total=len(variants), desc=f"Creating extra mutation {count+1}"):
+#             for i in range(mutation_range_start-1, mutation_range_end):
+#                 for aa in AA_vocab:
+#                     if aa != variant["mutated_sequence"][i]:
+#                         new_variant = {
+#                             "mutated_sequence": variant["mutated_sequence"][:i] + aa + variant["mutated_sequence"][i+1:],
+#                             "mutant": variant["mutant"] + f":{variant['mutated_sequence'][i]}{i+1}{aa}"
+#                         }
+#                         new_variants.append(new_variant)
+#         count += 1
+#         variants = pd.DataFrame(new_variants)
+#     return variants[['mutant','mutated_sequence']]
 
 def trim_DMS(DMS_data:pd.DataFrame, sampled_mutants:pd.DataFrame, mutation_rounds:int):
   for mutation in range(2):
@@ -429,4 +429,32 @@ def stratified_filtering(DMS, threshold, column_name='EVmutation'):
     threshold = 1
   filtered = DMS.groupby('strata', group_keys=False).apply(lambda x: x.sample(threshold))
   return filtered[['mutant', 'mutated_sequence']].reset_index(drop=True)
+############################################################################################################
+def list_of_dicts_to_df(lst):
+    return pd.DataFrame(lst)
 
+def generate_1extra_mutation(row, AA_vocab=AA_vocab, mutation_range_start=None, mutation_range_end=None):
+    seq = row["mutated_sequence"]
+    if mutation_range_start is None: mutation_range_start=1
+    if mutation_range_end is None: mutation_range_end=len(seq)
+    new_variants = []
+    for i in range(mutation_range_start-1, mutation_range_end):
+        for aa in AA_vocab:
+            if aa != seq[i]:
+                new_variant = {
+                    "mutated_sequence": seq[:i] + aa + seq[i+1:],
+                    "mutant": row["mutant"] + f":{seq[i]}{i+1}{aa}"
+                }
+                new_variants.append(new_variant)
+    return new_variants
+
+def apply_gen_1extra(DMS):
+  print(f'Creating 1 extra mutation')
+  data = DMS.apply(generate_1extra_mutation, axis=1)
+  # Apply function to each element of the Series
+  df = data.apply(list_of_dicts_to_df)
+  df
+
+  # Concatenate resulting DataFrames into a single DataFrame
+  df = pd.concat(df.to_list(), ignore_index=True)
+  return df

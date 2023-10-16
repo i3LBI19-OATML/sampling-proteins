@@ -74,7 +74,7 @@ def Evaluate(seq, extra, tokenizer, AA_vocab, max_length, Tmodel):
     score_heatmap, suggested_mutation, results, _ = app.score_and_create_matrix_all_singles(seq, None, None, scoring_mirror=False, batch_size_inference=20, max_number_positions_per_heatmap=50, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, with_heatmap=False, Tranception_model=Tmodel)
     
     results = results.sort_values(by=['avg_score'], ascending=False, ignore_index=True).head(max_length*2)
-    extension = app.generate_n_extra_mutations(results, extra, AA_vocab)
+    extension = app.apply_gen_1extra(results)
     prior, _ = app.score_multi_mutations(sequence=None, extra_mutants=extension, mutation_range_start=None, mutation_range_end=None, scoring_mirror=False, batch_size_inference=20, max_number_positions_per_heatmap=50, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=True, Tranception_model=Tmodel)
     
     child_priors = prior
