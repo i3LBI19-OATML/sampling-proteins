@@ -324,9 +324,13 @@ while len(generated_sequence) < sequence_num:
         subsamplings.append(f'QFF {strat}')
     if args.use_hpf:
         subsamplings.append('HPF')
+    if args.use_ams:
+        subsamplings.append('AMS')
+    if args.use_rsf:
+        subsamplings.append('RSF')
     subsamplingthreshold.append(intermediate_sampling_threshold)
     mutants.append(mutation_count)
-    seq_name = 'Tranception_{}_{}x_{}'.format(sequence_id, iteration, len(generated_sequence))
+    seq_name = f'Tranception_{sequence_id}_{iteration}x_{len(generated_sequence)}'
     generated_sequence_name.append(seq_name)
     mutation_list.append(';'.join(mutation_history))
     generation_time = time.time() - start_time
