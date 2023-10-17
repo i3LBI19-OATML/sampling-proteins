@@ -13,6 +13,7 @@ from tensorflow import keras
 import itertools
 import re
 import tqdm
+import time
 from scoring_metrics.util import identify_mutation, extract_mutations
 from EVmutation.model import CouplingsModel
 from EVmutation.tools import predict_mutation_table
@@ -338,6 +339,7 @@ def predict_evmutation(DMS, top_n, ev_model, return_evscore=False):
   # Load Model
   # c = CouplingsModel(model_params)
   c = ev_model
+  start_predict = time.time()
   print("===Predicting EVmutation===")
   DMS['mutant'] = DMS['mutant'].str.replace(':', ',')
   # print(f'ev predict table: {DMS}')
@@ -345,6 +347,7 @@ def predict_evmutation(DMS, top_n, ev_model, return_evscore=False):
   DMS = DMS.sort_values(by = 'EVmutation', ascending = False, ignore_index = True)
   # print(f'ev result table: {DMS}')
   print("===Predicting EVmutation Done===")
+  print(f"Evmutation prediction time: {time.time() - start_predict}")
   DMS['mutant'] = DMS['mutant'].str.replace(',', ':')
   if return_evscore:
     return DMS[['mutated_sequence', 'mutant', 'EVmutation']].head(top_n)
