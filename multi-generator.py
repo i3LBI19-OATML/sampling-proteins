@@ -189,7 +189,7 @@ while len(generated_sequence) < sequence_num:
                         extra_mutants = app.predict_evmutation(DMS=all_extra_mutants, top_n=intermediate_sampling_threshold, ev_model=ev_model)
                 
                 if args.use_hpf:
-                    mutation = top_k_sampling(last_mutation_round_DMS, k=int(10), sampler=final_sampler, multi=True)
+                    mutation = top_k_sampling(last_mutation_round_DMS, k=int(5), sampler=final_sampler, multi=True)
                     all_extra_mutants = app.apply_gen_1extra(DMS=mutation)
                     # trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
                     _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=all_extra_mutants,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
@@ -248,7 +248,7 @@ while len(generated_sequence) < sequence_num:
                         extra_mutants = app.predict_evmutation(DMS=all_extra_mutants, top_n=intermediate_sampling_threshold, ev_model=ev_model)
                 
                 if args.use_hpf:
-                    mutation = top_k_sampling(last_mutation_round_DMS, k=int(10), sampler=final_sampler, multi=True)
+                    mutation = top_k_sampling(last_mutation_round_DMS, k=int(5), sampler=final_sampler, multi=True)
                     all_extra_mutants = app.apply_gen_1extra(DMS=mutation)
                     # trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
                     _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=all_extra_mutants,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 

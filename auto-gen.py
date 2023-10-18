@@ -146,7 +146,8 @@ for idx in range(args.num_samples):
         # Decode for mirostat
         decoded = tokenizer.decode(outputs, skip_special_tokens=True, clean_up_tokenization_spaces=True)
         decoded = prompt + decoded # Add prompt to decoded sequence
-        seq = decoded.replace(' ', '').replace("\n", "")[:args.seq_len]
+        cleaned_seq = [id for id in decoded if id in AA_vocab]
+        seq = ''.join(cleaned_seq).replace(' ', '').replace("\n", "")[:args.seq_len]
 
     else:
         sampling_kwargs = sampling_args[args.sampling_method]
@@ -154,7 +155,8 @@ for idx in range(args.num_samples):
                           return_dict_in_generate=True, output_scores=True, **sampling_kwargs)
         # Decode for other methods
         decoded = tokenizer.batch_decode(outputs.sequences, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-        seq = decoded[0].replace(' ', '').replace("\n", "")[:args.seq_len]
+        cleaned_seq = [id for id in decoded[0] if id in AA_vocab]
+        seq = ''.join(cleaned_seq).replace(' ', '').replace("\n", "")[:args.seq_len]
 
     assert len(seq) == args.seq_len, f'Sequence length {len(seq)} does not match {args.seq_len}'
     seq_time_taken = round(time.time() - start_time, 3)
