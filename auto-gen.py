@@ -30,7 +30,7 @@ if args.sampling_method == 'top_k' or args.sampling_method == 'beam_search':
     assert args.sampling_threshold >= 2, f"{args.sampling_method} requires threshold >= 2"
     threshold = int(args.sampling_threshold)
 elif args.sampling_method == 'top_p' or args.sampling_method == 'typical':
-    assert args.sampling_threshold <= 1 and args.sampling_threshold > 0, f"{args.sampling_method} requires 0 < threshold <= 1"
+    assert 0 < args.sampling_threshold <= 1, f"{args.sampling_method} requires 0 < threshold <= 1, got {args.sampling_threshold}"
     threshold = float(args.sampling_threshold)
 else:
     threshold = 0
