@@ -32,6 +32,9 @@ if args.sampling_method == 'top_k' or args.sampling_method == 'beam_search':
 elif args.sampling_method == 'top_p' or args.sampling_method == 'typical':
     assert 0 < args.sampling_threshold <= 1, f"{args.sampling_method} requires 0 < threshold <= 1, got {args.sampling_threshold}"
     threshold = float(args.sampling_threshold)
+elif args.sampling_method == 'mirostat':
+    assert args.sampling_threshold > 0, f"{args.sampling_method} requires threshold > 0"
+    threshold = float(args.sampling_threshold)
 else:
     threshold = 0
 
@@ -42,7 +45,7 @@ sampling_args = {
     'beam_search': {'do_sample': False, 'num_beams': threshold, 'early_stopping': True},
     'random': {'do_sample': True, 'top_k': 0},
     'typical': {'do_sample': True, 'typical_p': threshold},
-    'mirostat': {}
+    'mirostat': {'target': threshold}
 }
 
 # Load model
@@ -87,7 +90,7 @@ overall_start_time = time.time()
 for idx in range(args.num_samples):
     start_time = time.time()
     if args.sampling_method == 'mirostat':
-        target_surprise = args.sampling_threshold
+        target_surprise = sampling_args[args.sampling_method]['target']
         max_surprise = 2*target_surprise
         error_surprise = 0
         running_tot_surprise = 0

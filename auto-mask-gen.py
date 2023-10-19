@@ -33,6 +33,9 @@ if args.sampling_method == 'top_k' or args.sampling_method == 'beam_search':
 elif args.sampling_method == 'top_p' or args.sampling_method == 'typical':
     assert args.sampling_threshold <= 1 and args.sampling_threshold > 0, f"{args.sampling_method} requires 0 < threshold <= 1"
     threshold = float(args.sampling_threshold)
+elif args.sampling_method == 'mirostat':
+    assert args.sampling_threshold > 0, f"{args.sampling_method} requires threshold > 0"
+    threshold = float(args.sampling_threshold)
 else:
     threshold = 0
 
@@ -43,7 +46,7 @@ sampling_args = {
     'beam_search': {'do_sample': False, 'num_beams': threshold, 'early_stopping': True},
     'random': {'do_sample': True, 'top_k': 0},
     'typical': {'do_sample': True, 'typical_p': threshold},
-    'mirostat': {}
+    'mirostat': {'target': threshold}
 }
 
 # Load model
@@ -185,6 +188,7 @@ for idx in range(args.num_samples): # Generate multiple samples
         else:
             generated_texts = prompted_text if part != '?' else generated_texts
             generated_texts = generated_texts.replace(' ', '').replace("\n", "")
+    
     assert len(generated_texts) == len(orig_prompt), f'Sequence length {len(generated_texts)} does not match original {len(orig_prompt)}'
     seq_time_taken = round(time.time() - start_time, 3)
     print(f'Output {idx+1}_{len(generated_texts)} {seq_time_taken}s: {generated_texts}') # Print sequence
