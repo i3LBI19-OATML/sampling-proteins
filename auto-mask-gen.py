@@ -103,7 +103,7 @@ for idx in range(args.num_samples): # Generate multiple samples
         if args.debug:
             print(f'Parts: {part}')
             print(f'Prompted text: {clean_prompted}')
-        inputs = tokenizer(f'<|endoftext|>{clean_prompted}', return_tensors="pt").to("cuda") if args.model_type == 'ProtGPT2' else tokenizer(clean_prompted, return_tensors="pt").to("cuda")
+        inputs = tokenizer(f'<|endoftext|>{clean_prompted}', return_tensors="pt").to("cuda") if args.model_type == 'ProtGPT2' else tokenizer(prompted_text, return_tensors="pt").to("cuda")
 
         valid = False if part == '?' else True
         while not valid:
@@ -114,7 +114,7 @@ for idx in range(args.num_samples): # Generate multiple samples
                 error_surprise = 0
                 running_tot_surprise = 0
                 learning_rate = 1
-                num_tokens = 1
+                num_tokens = 2
                 n=tokenizer.vocab_size if args.model_type == 'ProtXLNet' else len(tokenizer.vocab)
 
                 # file_string = args.context
@@ -173,7 +173,7 @@ for idx in range(args.num_samples): # Generate multiple samples
 
             else:
                 sampling_kwargs = sampling_args[args.sampling_method]
-                outputs = model.generate(**inputs, min_new_tokens=1, max_new_tokens=2, pad_token_id=tokenizer.eos_token_id,
+                outputs = model.generate(**inputs, min_new_tokens=2, max_new_tokens=4, pad_token_id=tokenizer.eos_token_id,
                                 return_dict_in_generate=True, output_scores=True, **sampling_kwargs)
                 # Decode for other methods
                 decoded = tokenizer.batch_decode(outputs.sequences, skip_special_tokens=True, clean_up_tokenization_spaces=True)
