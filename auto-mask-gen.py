@@ -102,9 +102,8 @@ for idx in range(args.num_samples): # Generate multiple samples
         clean_prompted = prompted_text.replace(' ', '').replace("\n", "")
         if args.debug:
             print(f'Parts: {part}')
-            print(f'Prompted text: {prompted_text}')
-        inputs = tokenizer(prompted_text, return_tensors="pt").to("cuda")
-        inputs = tokenizer(prompted_text+' ', return_tensors="pt").to("cuda") if args.model_type == 'ProtGPT2' and not prompted_text else inputs
+            print(f'Prompted text: {clean_prompted}')
+        inputs = tokenizer(f'<|endoftext|>{clean_prompted}', return_tensors="pt").to("cuda") if args.model_type == 'ProtGPT2' else tokenizer(clean_prompted, return_tensors="pt").to("cuda")
 
         valid = False if part == '?' else True
         while not valid:
@@ -120,9 +119,9 @@ for idx in range(args.num_samples): # Generate multiple samples
 
                 # file_string = args.context
                 # f = open(file_string, "r")
-                context_text = prompted_text
+                context_text = clean_prompted
                 context = torch.tensor([tokenizer.encode(context_text)])
-                context = torch.tensor([tokenizer.encode(context_text+' ')]) if args.model_type == 'ProtGPT2' and not context_text else context
+                context = torch.tensor([tokenizer.encode(f'<|endoftext|>{context_text}')]) if args.model_type == 'ProtGPT2' and not context_text else context
                 outputs = []
                 prev = context
                 past = None
@@ -183,6 +182,7 @@ for idx in range(args.num_samples): # Generate multiple samples
             # generated_texts = generated_texts.replace(' ', '').replace("\n", "") if args.model_type == 'ProtXLNet' else generated_texts
             valid = True if generated_texts and len(generated_texts) == len(clean_prompted)+1 and all(token in AA_vocab for token in process_prompt_protxlnet(generated_texts).split()) else False
             if args.debug:
+                print(f'Decoded: {decoded[0]}')
                 print(f'Generated text: {generated_texts}')
                 print(f'=====================================')
         else:
