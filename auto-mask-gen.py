@@ -103,7 +103,7 @@ for idx in range(args.num_samples): # Generate multiple samples
         if args.debug:
             print(f'Parts: {part}')
             print(f'Prompted text: {clean_prompted}')
-        inputs = tokenizer(f'<|endoftext|>{clean_prompted}', return_tensors="pt").to("cuda") if args.model_type == 'ProtGPT2' else tokenizer(prompted_text, return_tensors="pt").to("cuda")
+        inputs = tokenizer(f'<|endoftext|>{clean_prompted} ', return_tensors="pt").to("cuda") if args.model_type == 'ProtGPT2' else tokenizer(prompted_text, return_tensors="pt").to("cuda")
 
         valid = False if part == '?' else True
         while not valid:
@@ -120,8 +120,7 @@ for idx in range(args.num_samples): # Generate multiple samples
                 # file_string = args.context
                 # f = open(file_string, "r")
                 context_text = clean_prompted
-                context = torch.tensor([tokenizer.encode(context_text)])
-                context = torch.tensor([tokenizer.encode(f'<|endoftext|>{context_text}')]) if args.model_type == 'ProtGPT2' and not context_text else context
+                context = torch.tensor([tokenizer.encode(f'<|endoftext|>{context_text}')]) if args.model_type == 'ProtGPT2' else torch.tensor([tokenizer.encode(context_text)])
                 outputs = []
                 prev = context
                 past = None
@@ -173,7 +172,7 @@ for idx in range(args.num_samples): # Generate multiple samples
 
             else:
                 sampling_kwargs = sampling_args[args.sampling_method]
-                outputs = model.generate(**inputs, min_new_tokens=2, max_new_tokens=4, pad_token_id=tokenizer.eos_token_id,
+                outputs = model.generate(**inputs, min_new_tokens=2, max_new_tokens=10, pad_token_id=tokenizer.eos_token_id,
                                 return_dict_in_generate=True, output_scores=True, **sampling_kwargs)
                 # Decode for other methods
                 decoded = tokenizer.batch_decode(outputs.sequences, skip_special_tokens=True, clean_up_tokenization_spaces=True)
