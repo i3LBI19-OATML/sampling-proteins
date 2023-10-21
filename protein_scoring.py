@@ -163,13 +163,11 @@ ss_metrics.ESM_1v(target_files, results, device)
 ss_metrics.ESM_1v_mask6(target_files, results, device)
 ss_metrics.Repeat(target_files, repeat_score, results)
 if args.use_tranception:
-  ss_metrics.Tranception(target_files=target_files, orig_seq=args.orig_seq.upper(), results=results, device=device, model_type="Small")
+  ss_metrics.Tranception(target_files=target_files, orig_seq=args.orig_seq.upper(), results=results, device=device, model_type="Large")
 
 # Download results
 df = pd.DataFrame.from_dict(results, orient="index")
 df["FID"] = fretchet_score
-# if not identity_score:
-#   df['Identity'] = None
 
 # delete temporary files
 os.remove(reference_seqs_file)

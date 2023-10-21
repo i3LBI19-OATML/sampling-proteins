@@ -104,7 +104,7 @@ def Repeat(target_files, repeat_score, results):
                 add_metric(results, name, f"longest_repeat_{k}", score)
 
 # Tranception
-def Tranception(target_files, orig_seq, results, device, model_type="Small"):
+def Tranception(target_files, orig_seq, results, device, model_type="Large"):
   if device=='cuda:0':
     torch.cuda.empty_cache()
   for targets_fasta in target_files:
