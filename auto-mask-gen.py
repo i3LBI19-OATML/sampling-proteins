@@ -51,6 +51,7 @@ sampling_args = {
 
 # Load model
 print(f"=================STARTING=================")
+token_modifier = {}
 if args.model_type == 'Tranception':
     model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(args.local_model, local_files_only=True)
     tokenizer = PreTrainedTokenizerFast(tokenizer_file=os.path.join(os.path.dirname(os.path.realpath(__file__)), "tranception/utils/tokenizers/Basic_tokenizer"),
@@ -64,7 +65,7 @@ elif args.model_type == 'ProtGPT2' or args.model_type == 'RITA':
     tokenizer = AutoTokenizer.from_pretrained(args.local_model)
     model = AutoModelForCausalLM.from_pretrained(args.local_model, local_files_only=True, trust_remote_code=True)
     if args.model_type == 'RITA':
-        tokenizer.eos_token_id = 2
+        token_modifier.update({"eos_token_id": 2})
 elif args.model_type == 'ProtXLNet':
     tokenizer = XLNetTokenizer.from_pretrained(args.local_model)
     model = XLNetLMHeadModel.from_pretrained(args.local_model)
@@ -174,8 +175,8 @@ for idx in range(args.num_samples): # Generate multiple samples
 
             else:
                 sampling_kwargs = sampling_args[args.sampling_method]
-                outputs = model.generate(**inputs, min_new_tokens=2, max_new_tokens=10, pad_token_id=tokenizer.eos_token_id,
-                                return_dict_in_generate=True, output_scores=True, **sampling_kwargs)
+                outputs = model.generate(**inputs, min_new_tokens=2, max_new_tokens=10,
+                                return_dict_in_generate=True, output_scores=True, **sampling_kwargs, **token_modifier)
                 # Decode for other methods
                 decoded = tokenizer.batch_decode(outputs.sequences, skip_special_tokens=True, clean_up_tokenization_spaces=True)
                 generated_texts = decoded[0].replace(' ', '').replace("\n", "")[:len(clean_prompted)+1]
