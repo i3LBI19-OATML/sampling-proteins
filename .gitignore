@@ -30,3 +30,5 @@ output_scores.csv
 
 masked-ar_protgen/*
 ar_protgen/*
+
+EVmutation/example/*

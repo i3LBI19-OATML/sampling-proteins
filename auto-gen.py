@@ -62,6 +62,8 @@ if args.model_type == 'Tranception':
 elif args.model_type == 'ProtGPT2' or args.model_type == 'RITA':
     tokenizer = AutoTokenizer.from_pretrained(args.local_model)
     model = AutoModelForCausalLM.from_pretrained(args.local_model, local_files_only=True, trust_remote_code=True)
+    if args.model_type == 'RITA':
+        tokenizer.eos_token_id = 2
 elif args.model_type == 'ProtXLNet':
     tokenizer = XLNetTokenizer.from_pretrained(args.local_model)
     model = XLNetLMHeadModel.from_pretrained(args.local_model)
@@ -76,6 +78,7 @@ prompt = process_prompt_protxlnet(prompt) if args.model_type == 'ProtXLNet' else
 print(f'Prompt: {prompt}')
 print(f'Prompt length: {len(args.prompt)}')
 des_seq_len = args.seq_len + 2 # Add 2 for special tokens
+max_seq_len = 1024 if des_seq_len*2 > 1024 else des_seq_len*2 # Max sequence length is 1024
 inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
 
 # Initialize list of results
@@ -95,7 +98,7 @@ for idx in range(args.num_samples):
         error_surprise = 0
         running_tot_surprise = 0
         learning_rate = 1
-        num_tokens = des_seq_len*2
+        num_tokens = max_seq_len
         n=tokenizer.vocab_size if args.model_type == 'ProtXLNet' else len(tokenizer.vocab)
 
         # file_string = args.context
@@ -154,7 +157,7 @@ for idx in range(args.num_samples):
 
     else:
         sampling_kwargs = sampling_args[args.sampling_method]
-        outputs = model.generate(**inputs, min_length=des_seq_len, max_length=des_seq_len*2, 
+        outputs = model.generate(**inputs, min_length=des_seq_len, max_length=max_seq_len, pad_token_id=tokenizer.eos_token_id,
                           return_dict_in_generate=True, output_scores=True, **sampling_kwargs)
         # Decode for other methods
         decoded = tokenizer.batch_decode(outputs.sequences, skip_special_tokens=True, clean_up_tokenization_spaces=True)
