@@ -172,7 +172,7 @@ for idx in range(args.num_samples): # Generate multiple samples
 
             else:
                 sampling_kwargs = sampling_args[args.sampling_method]
-                outputs = model.generate(**inputs, min_new_tokens=2, max_new_tokens=10, pad_token_id=tokenizer.eos_token_id,
+                outputs = model.generate(**inputs, min_new_tokens=2, max_new_tokens=10,
                                 return_dict_in_generate=True, output_scores=True, **sampling_kwargs)
                 # Decode for other methods
                 decoded = tokenizer.batch_decode(outputs.sequences, skip_special_tokens=True, clean_up_tokenization_spaces=True)
