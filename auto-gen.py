@@ -154,7 +154,7 @@ for idx in range(args.num_samples):
 
     else:
         sampling_kwargs = sampling_args[args.sampling_method]
-        outputs = model.generate(**inputs, min_length=des_seq_len, max_length=des_seq_len*2, eos_token_id=2, 
+        outputs = model.generate(**inputs, min_length=des_seq_len, max_length=des_seq_len*2, pad_token_id=tokenizer.eos_token_id, 
                           return_dict_in_generate=True, output_scores=True, **sampling_kwargs)
         # Decode for other methods
         decoded = tokenizer.batch_decode(outputs.sequences, skip_special_tokens=True, clean_up_tokenization_spaces=True)
