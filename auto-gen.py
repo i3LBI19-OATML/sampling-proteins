@@ -26,6 +26,7 @@ args = parser.parse_args()
 
 AA_vocab = "ACDEFGHIKLMNPQRSTVWY"
 # Define arguments for each sampling method
+assert args.seq_len <= 1024, f"Sequence length must be <= 1024, got {args.seq_len}"
 if args.sampling_method == 'top_k' or args.sampling_method == 'beam_search':
     assert args.sampling_threshold >= 2, f"{args.sampling_method} requires threshold >= 2"
     threshold = int(args.sampling_threshold)
@@ -99,7 +100,7 @@ for idx in range(args.num_samples):
         error_surprise = 0
         running_tot_surprise = 0
         learning_rate = 1
-        num_tokens = max_seq_len
+        num_tokens = des_seq_len
         n=tokenizer.vocab_size if args.model_type == 'ProtXLNet' else len(tokenizer.vocab)
 
         # file_string = args.context
