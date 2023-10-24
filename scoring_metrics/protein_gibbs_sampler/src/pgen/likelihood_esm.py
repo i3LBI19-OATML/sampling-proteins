@@ -21,6 +21,7 @@ def main(input_h, output_h, masking_off, device, model, batch_size, mask_distanc
     sampler = ESM_sampler(model_map[model](),device=device)
     
     in_seqs = list(zip(*parse_fasta(input_h, return_names=True, clean="unalign")))
+    # print(f'input: {input_h}\nparsed_fasta: {in_seqs}')
 
     sep="\t"
     if csv:

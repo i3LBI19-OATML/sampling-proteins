@@ -14,6 +14,7 @@ import os
 import sys
 from Bio import SearchIO
 
+ESM_ALLOWED_AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
 
 class RawAndDefaultsFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawTextHelpFormatter):
     pass
@@ -116,7 +117,8 @@ def parse_fasta(filename, return_names=False, clean=None, full_name=False):
             if full_name:
                 name = line[1:]
             else:
-                parts = line.split(None, 1)
+                line = line.replace('|', '/')
+                parts = line.split('/', 1)
                 name = parts[0][1:]
             out_names.append(name)
             if (prev_name is not None):
@@ -152,7 +154,10 @@ def parse_fasta(filename, return_names=False, clean=None, full_name=False):
         for i in range(len(out_seqs)):
             out_seqs[i] = remove_insertions(out_seqs[i].upper())
     elif clean == 'unalign':
-        deletekeys = {'*': None, ".": None, "-": None, "X": None}
+        anyX = str(random.choice(ESM_ALLOWED_AMINO_ACIDS))
+        anyB = str(random.choice("ND"))
+        anyZ = str(random.choice("EQ"))
+        deletekeys = {'*': None, ".": None, "-": None, "X": anyX, "B": anyB, "Z": anyZ}
         
         translation = str.maketrans(deletekeys)
         remove_insertions = lambda x: x.translate(translation)

@@ -94,7 +94,7 @@ for _, row in tqdm.tqdm(data_df.iterrows(), total=len(data_df)):
   else:
     ID = batch+'/'+sampling+'/'+jobname
   destination_path = '/'.join(ID.split('/')[:-1])
-  print(f'Destination path: {destination_path}')
+  # print(f'Destination path: {destination_path}')
 
   seqs = sequence.split(":")
   lengths = [len(s) for s in seqs]
