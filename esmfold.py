@@ -20,6 +20,7 @@ parser.add_argument("--target_dir", type=str, required=True, help="Directory con
 parser.add_argument("--reference_pdb", type=str, required=True, help="Reference pdb file")
 parser.add_argument("--copies", default=1, type=int, help="Number of copies of the sequence")
 parser.add_argument("--num_recycles", default=3, type=int, choices=[0, 1, 2, 3, 6, 12, 24], help="Number of recycles")
+parser.add_argument("--keep_pdb", action='store_true', help="Keep pdb files")
 args = parser.parse_args()
 
 model_name = "esmfold.model"
@@ -92,6 +93,9 @@ for _, row in tqdm.tqdm(data_df.iterrows(), total=len(data_df)):
     ID = path_prefix+'/'+batch+'/'+sampling+'/'+jobname
   else:
     ID = batch+'/'+sampling+'/'+jobname
+  destination_path = '/'.join(ID.split('/')[:-1])
+  print(f'Destination path: {destination_path}')
+
   seqs = sequence.split(":")
   lengths = [len(s) for s in seqs]
   length = sum(lengths)
@@ -145,6 +149,10 @@ for _, row in tqdm.tqdm(data_df.iterrows(), total=len(data_df)):
   pdb_file = f"{prefix}.pdb"
   tmscore = tmscoring.get_tm(reference_pdb, pdb_file)
   tm_list.append(tmscore)
+
+  # delete pdb folder
+  if not args.keep_pdb:
+    os.system(f"rm -rf {destination_path}")
 
   print(f'ptm: {ptm:.3f} plddt: {plddt:.3f} tmscore: {tmscore:.3f} time: {end_time:.3f}')
 

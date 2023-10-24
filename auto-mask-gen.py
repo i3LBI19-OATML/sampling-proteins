@@ -81,6 +81,7 @@ prompt = replacer(orig_prompt, args.mutation_sites)
 prompt = process_prompt_protxlnet(prompt) if args.model_type == 'ProtXLNet' else prompt
 prompt_parts = split_mask(prompt)
 print(f'Prompt: {prompt}')
+print(f'Mutation Sites: {args.mutation_sites}')
 print(f'Prompt parts: {prompt_parts}')
 print(f'Prompt length: {len(orig_prompt)}')
 # seq_len = args.seq_len + 2 # +2 for BOS and EOS
@@ -103,13 +104,15 @@ for idx in range(args.num_samples): # Generate multiple samples
         prompted_text = generated_texts + part if part != '?' else generated_texts
         prompted_text = process_prompt_protxlnet(prompted_text.replace(' ', '').replace("\n", "")) if args.model_type == 'ProtXLNet' else prompted_text
         clean_prompted = prompted_text.replace(' ', '').replace("\n", "")
-        if args.debug:
-            print(f'Parts: {part}')
-            print(f'Prompted text: {clean_prompted}')
+        # if args.debug:
+        #     print(f'Parts: {part}')
+        #     print(f'Prompted text: {clean_prompted}')
         inputs = tokenizer(f'<|endoftext|>{clean_prompted} ', return_tensors="pt").to("cuda") if args.model_type == 'ProtGPT2' else tokenizer(prompted_text, return_tensors="pt").to("cuda")
 
         valid = False if part == '?' else True
+        round_counter = 0
         while not valid:
+            round_counter += 1
             # Generate
             if args.sampling_method == 'mirostat':
                 target_surprise = args.sampling_threshold
@@ -183,7 +186,9 @@ for idx in range(args.num_samples): # Generate multiple samples
 
             # generated_texts = generated_texts.replace(' ', '').replace("\n", "") if args.model_type == 'ProtXLNet' else generated_texts
             valid = True if generated_texts and len(generated_texts) == len(clean_prompted)+1 and all(token in AA_vocab for token in process_prompt_protxlnet(generated_texts).split()) else False
-            if args.debug:
+            if args.debug or round_counter > 2:
+                print(f'Parts: {part} Site: {len(generated_texts)}')
+                print(f'Prompted text: {clean_prompted}')
                 print(f'Decoded: {decoded[0]}')
                 print(f'Generated text: {generated_texts}')
                 print(f'=====================================')
@@ -197,7 +202,7 @@ for idx in range(args.num_samples): # Generate multiple samples
     
     # Save results
     samp_thres = None if threshold == 0 else threshold
-    name = f'{args.model_type}_{idx+1}_{len(generated_texts)}'
+    name = f"{args.model_type}_{idx+1}_{len(generated_texts)}|{'-'.join([str(int) for int in args.mutation_sites])}"
     results.append({'name': name, 'sequence': generated_texts, 'time': seq_time_taken, 'sampling': args.sampling_method, 'threshold': samp_thres})
 
 
