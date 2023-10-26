@@ -104,7 +104,7 @@ def Repeat(target_files, repeat_score, results):
                 add_metric(results, name, f"longest_repeat_{k}", score)
 
 # Tranception
-def Tranception(target_files, orig_seq, results, device, model_type="Large"):
+def Tranception(target_files, orig_seq, results, device, model_type="Large", local_model=os.path.expanduser("~/Tranception_Large")):
   if device=='cuda:0':
     torch.cuda.empty_cache()
   for targets_fasta in target_files:
@@ -116,12 +116,17 @@ def Tranception(target_files, orig_seq, results, device, model_type="Large"):
           seqeunce.append(sequence)
       targets = pd.DataFrame({"id":identifiers,"mutated_sequence":seqeunce})
     print("Tranception scores computing...")
-    if model_type=="Small":
-      model = model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Small")
-    elif model_type=="Medium":
-      model = model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Medium")
-    elif model_type=="Large":
-      model = model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Large")
+    try:
+      model = model_pytorch.TranceptionLMHeadModel.from_pretrained(local_model, local_files_only=True)
+      print("Tranception model loaded from local file")
+    except:
+      print("Downloading Tranception model...")
+      if model_type=="Small":
+        model = model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Small")
+      elif model_type=="Medium":
+        model = model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Medium")
+      elif model_type=="Large":
+        model = model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Large")
     if torch.cuda.is_available():
       model.cuda()
       print("Inference will take place on GPU")
