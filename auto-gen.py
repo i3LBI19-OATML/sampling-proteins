@@ -62,15 +62,15 @@ if args.model_type == 'Tranception':
                                                     mask_token="[MASK]"
                                                 )
 elif args.model_type == 'ProtGPT2' or args.model_type == 'RITA':
-    tokenizer = AutoTokenizer.from_pretrained(args.local_model)
-    model = AutoModelForCausalLM.from_pretrained(args.local_model, local_files_only=True, trust_remote_code=True)
     if args.model_type == 'RITA':
         token_modifier.update({"eos_token_id": 2})
+    tokenizer = AutoTokenizer.from_pretrained(args.local_model)
+    model = AutoModelForCausalLM.from_pretrained(args.local_model, local_files_only=True, trust_remote_code=True, device_map="auto")
 elif args.model_type == 'ProtXLNet':
     tokenizer = XLNetTokenizer.from_pretrained(args.local_model)
     model = XLNetLMHeadModel.from_pretrained(args.local_model)
     
-model.cuda()
+model.eval().cuda()
 model.config.tokenizer = tokenizer
 print("Model successfully loaded from local")
 
@@ -80,7 +80,8 @@ prompt = process_prompt_protxlnet(prompt) if args.model_type == 'ProtXLNet' else
 print(f'Prompt: {prompt}')
 print(f'Prompt length: {len(args.prompt)}')
 des_seq_len = args.seq_len + 2 # Add 2 for special tokens
-max_seq_len = 1024 if des_seq_len*2 > 1024 else des_seq_len*2 # Max sequence length is 1024
+max_seq_len = des_seq_len * 2
+max_seq_len = 1024 if max_seq_len > 1024 else max_seq_len # Max sequence length is 1024
 inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
 
 # Initialize list of results
@@ -100,7 +101,7 @@ for idx in range(args.num_samples):
         error_surprise = 0
         running_tot_surprise = 0
         learning_rate = 1
-        num_tokens = des_seq_len
+        num_tokens = max_seq_len
         n=tokenizer.vocab_size if args.model_type == 'ProtXLNet' else len(tokenizer.vocab)
 
         # file_string = args.context
@@ -158,13 +159,14 @@ for idx in range(args.num_samples):
         seq = ''.join(cleaned_seq).replace(' ', '').replace("\n", "")[:args.seq_len]
 
     else:
-        sampling_kwargs = sampling_args[args.sampling_method]
-        outputs = model.generate(**inputs, min_length=des_seq_len, max_length=max_seq_len,
-                          return_dict_in_generate=True, output_scores=True, **sampling_kwargs, **token_modifier)
-        # Decode for other methods
-        decoded = tokenizer.batch_decode(outputs.sequences, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-        cleaned_seq = [id for id in decoded[0] if id in AA_vocab]
-        seq = ''.join(cleaned_seq).replace(' ', '').replace("\n", "")[:args.seq_len]
+        with torch.no_grad():
+            sampling_kwargs = sampling_args[args.sampling_method]
+            outputs = model.generate(**inputs, min_length=des_seq_len, max_length=max_seq_len,
+                            return_dict_in_generate=True, output_scores=True, **sampling_kwargs, **token_modifier)
+            # Decode for other methods
+            decoded = tokenizer.batch_decode(outputs.sequences, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+            cleaned_seq = [id for id in decoded[0] if id in AA_vocab]
+            seq = ''.join(cleaned_seq).replace(' ', '').replace("\n", "")[:args.seq_len]
 
     assert len(seq) == args.seq_len, f'Sequence length {len(seq)} does not match {args.seq_len}'
     seq_time_taken = round(time.time() - start_time, 3)
