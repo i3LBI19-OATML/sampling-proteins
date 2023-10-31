@@ -65,7 +65,7 @@ elif args.model_type == 'ProtGPT2' or args.model_type == 'RITA':
     if args.model_type == 'RITA':
         token_modifier.update({"eos_token_id": 2})
     tokenizer = AutoTokenizer.from_pretrained(args.local_model)
-    model = AutoModelForCausalLM.from_pretrained(args.local_model, local_files_only=True, trust_remote_code=True, device_map="auto")
+    model = AutoModelForCausalLM.from_pretrained(args.local_model, local_files_only=True, trust_remote_code=True)
 elif args.model_type == 'ProtXLNet':
     tokenizer = XLNetTokenizer.from_pretrained(args.local_model)
     model = XLNetLMHeadModel.from_pretrained(args.local_model)
