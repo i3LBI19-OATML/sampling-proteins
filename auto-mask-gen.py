@@ -186,7 +186,7 @@ for idx in range(args.num_samples): # Generate multiple samples
 
             # generated_texts = generated_texts.replace(' ', '').replace("\n", "") if args.model_type == 'ProtXLNet' else generated_texts
             valid = True if generated_texts and len(generated_texts) == len(clean_prompted)+1 and all(token in AA_vocab for token in process_prompt_protxlnet(generated_texts).split()) else False
-            if args.debug or round_counter > 2:
+            if args.debug or round_counter > 5:
                 print(f'Parts: {part} Site: {len(generated_texts)}')
                 print(f'Prompted text: {clean_prompted}')
                 print(f'Decoded: {decoded[0]}')
