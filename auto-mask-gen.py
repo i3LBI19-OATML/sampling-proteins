@@ -107,7 +107,7 @@ for idx in range(args.num_samples): # Generate multiple samples
         # if args.debug:
         #     print(f'Parts: {part}')
         #     print(f'Prompted text: {clean_prompted}')
-        inputs = tokenizer(f'<|endoftext|>{clean_prompted} ', return_tensors="pt").to("cuda") if args.model_type == 'ProtGPT2' else tokenizer(prompted_text, return_tensors="pt").to("cuda")
+        inputs = tokenizer(f'<|endoftext|>{clean_prompted}\n', return_tensors="pt").to("cuda") if args.model_type == 'ProtGPT2' else tokenizer(prompted_text, return_tensors="pt").to("cuda")
 
         valid = False if part == '?' else True
         round_counter = 0
@@ -126,7 +126,7 @@ for idx in range(args.num_samples): # Generate multiple samples
                 # file_string = args.context
                 # f = open(file_string, "r")
                 context_text = clean_prompted
-                context = torch.tensor([tokenizer.encode(f'<|endoftext|>{context_text}')]) if args.model_type == 'ProtGPT2' else torch.tensor([tokenizer.encode(context_text)])
+                context = torch.tensor([tokenizer.encode(f'<|endoftext|>{context_text}\n')]) if args.model_type == 'ProtGPT2' else torch.tensor([tokenizer.encode(context_text)])
                 outputs = []
                 prev = context
                 past = None
