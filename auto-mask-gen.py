@@ -202,7 +202,8 @@ for idx in range(args.num_samples): # Generate multiple samples
     
     # Save results
     samp_thres = None if threshold == 0 else threshold
-    name = f"{args.model_type}_{idx+1}_{len(generated_texts)}|{'-'.join([str(int) for int in args.mutation_sites])}"
+    name = f'{args.model_type}_{idx+1}_{len(generated_texts)}'
+    # name = f"{args.model_type}_{idx+1}_{len(generated_texts)}|{'-'.join([str(int) for int in args.mutation_sites])}"
     results.append({'name': name, 'sequence': generated_texts, 'time': seq_time_taken, 'sampling': args.sampling_method, 'threshold': samp_thres})
 
 
