@@ -71,11 +71,11 @@ def UCT_search(state, max_length, extra, tokenizer, Tmodel, AA_vocab=AA_vocab):
 
 def Evaluate(seq, extra, tokenizer, AA_vocab, max_length, Tmodel):
     # df_seq = pd.DataFrame.from_dict({'mutated_sequence': [seq]})
-    score_heatmap, suggested_mutation, results, _ = app.score_and_create_matrix_all_singles(seq, None, None, scoring_mirror=False, batch_size_inference=20, max_number_positions_per_heatmap=50, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, with_heatmap=False, Tranception_model=Tmodel)
+    score_heatmap, suggested_mutation, results, _ = app.score_and_create_matrix_all_singles(seq, Tmodel, None, None, scoring_mirror=False, batch_size_inference=20, max_number_positions_per_heatmap=50, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, with_heatmap=False)
     
     results = results.sort_values(by=['avg_score'], ascending=False, ignore_index=True).head(max_length*2)
     extension = app.apply_gen_1extra(results)
-    prior, _ = app.score_multi_mutations(sequence=None, extra_mutants=extension, mutation_range_start=None, mutation_range_end=None, scoring_mirror=False, batch_size_inference=20, max_number_positions_per_heatmap=50, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=True, Tranception_model=Tmodel)
+    prior, _ = app.score_multi_mutations(sequence=None, Tranception_model=Tmodel, extra_mutants=extension, mutation_range_start=None, mutation_range_end=None, scoring_mirror=False, batch_size_inference=20, max_number_positions_per_heatmap=50, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=True)
     
     child_priors = prior
     value_estimate = float(results['avg_score'].values[0])
