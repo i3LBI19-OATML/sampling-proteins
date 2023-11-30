@@ -113,10 +113,10 @@ def estimate_s(prob):
 
 
 def compute_k(n,s,tau):
-    eps = s-1
-    k = Decimal(((eps*(2**(tau)))/(1-n**(-eps)))**(1/s))
-    k = round(k)
-    return k
+  eps = s-1
+  k = (Decimal(eps) * Decimal(Decimal(2) ** Decimal(tau))) / (Decimal(1) - Decimal(n) ** Decimal(-eps))
+  k = Decimal((Decimal(k) ** (Decimal(1) / Decimal(s))))
+  return round(k)
 
 # Mirostat Sampling
 def mirostat_sampling(scores: pd.DataFrame, tau:float = 3.0, sampler = temperature_sampler(temperature=1.0), vocab=AA_vocab, multi=False):

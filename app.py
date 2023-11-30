@@ -430,7 +430,7 @@ def stratified_filtering(DMS, threshold, column_name='EVmutation'):
     threshold = threshold // 4
   elif threshold < 4:
     threshold = 1
-  filtered = DMS.groupby('strata', group_keys=False).apply(lambda x: x.sample(threshold))
+  filtered = DMS.groupby('strata', group_keys=False).apply(lambda x: x.sample(min(len(x), threshold)))
   return filtered[['mutant', 'mutated_sequence']].reset_index(drop=True)
 ############################################################################################################
 def list_of_dicts_to_df(lst):
