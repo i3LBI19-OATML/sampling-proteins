@@ -2,6 +2,7 @@ name: protein_generator
 channels:
   - conda-forge
   - anaconda
+  - huggingface
 dependencies:
   - python=3.8
   - pip
@@ -19,5 +20,6 @@ dependencies:
   - tqdm
   - biotite
   - importlib_metadata
+  - safetensors
   - pip:
       - -e ./protein_bert/
