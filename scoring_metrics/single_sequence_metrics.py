@@ -104,7 +104,7 @@ def Repeat(target_files, repeat_score, results):
                 add_metric(results, name, f"longest_repeat_{k}", score)
 
 # Tranception
-def Tranception(target_files, orig_seq, results, device, model_type="Large", local_model=os.path.expanduser("~/Tranception_Large")):
+def Tranception(target_files, orig_seq, results, device, model_type="Large", local_model=os.path.expanduser("~/Tranception_Large"), past_key_values=None):
   if device=='cuda:0':
     torch.cuda.empty_cache()
   for targets_fasta in target_files:
@@ -140,15 +140,17 @@ def Tranception(target_files, orig_seq, results, device, model_type="Large", loc
                                                     mask_token="[MASK]"
                                                 )
     model.config.tokenizer = tokenizer
-    scores = model.score_mutants(DMS_data=targets, 
+    scores, past_key_values = model.score_mutants(DMS_data=targets, 
                                     target_seq=orig_seq, # need template seq
                                     scoring_mirror=False, 
                                     batch_size_inference=20,  
                                     num_workers=0, 
-                                    indel_mode=True
+                                    indel_mode=True,
+                                    past_key_values=past_key_values,
                                     )
     print("Tranception scores computed")
     scores = pd.merge(scores,targets,on="mutated_sequence",how="left")
     for i, row in scores.iterrows():
         add_metric(results, row["id"], "Tranception", row["avg_score"])
     del scores
+    return past_key_values
