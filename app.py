@@ -206,7 +206,7 @@ def get_mutated_protein(sequence,mutant):
   mutated_sequence = list(sequence)
   multi_mutant=True if len(mutant.split(':'))>1 else False
   if multi_mutant:
-    print("multi_mutant detected")
+    print("multi mutant detected")
     assert check_valid_mutant(sequence,mutant, multi_mutant=True), "The mutant is not valid"
     for m in mutant.split(':'):
       from_AA, position, to_AA = m[0], int(m[1:-1]), m[-1]
