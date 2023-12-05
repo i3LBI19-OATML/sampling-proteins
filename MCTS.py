@@ -59,26 +59,26 @@ class UCTNode():
       current = current.parent
     print("========END OF ITERATION========")
 
-def UCT_search(state, max_length, extra, tokenizer, Tmodel, AA_vocab=AA_vocab):
+def UCT_search(state, max_length, extra, tokenizer, Tmodel, AA_vocab=AA_vocab, past_key_values=None):
   root = UCTNode(state)
   for _ in range(max_length):
     leaf = root.select_leaf()
-    child_priors, value_estimate = Evaluate(leaf.state, extra, tokenizer, AA_vocab, max_length, Tmodel)
+    child_priors, value_estimate, past_key_values = Evaluate(leaf.state, extra, tokenizer, AA_vocab, max_length, Tmodel, past_key_values=past_key_values)
     leaf.expand(child_priors)
     leaf.backup(value_estimate)
     output = max(root.children.items(), key=lambda item: item[1].number_visits)
-  return output[1].move
+  return output[1].move, past_key_values
 
-def Evaluate(seq, extra, tokenizer, AA_vocab, max_length, Tmodel):
+def Evaluate(seq, extra, tokenizer, AA_vocab, max_length, Tmodel, past_key_values=None):
     # df_seq = pd.DataFrame.from_dict({'mutated_sequence': [seq]})
-    score_heatmap, suggested_mutation, results, _ = app.score_and_create_matrix_all_singles(seq, Tmodel, None, None, scoring_mirror=False, batch_size_inference=20, max_number_positions_per_heatmap=50, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, with_heatmap=False)
+    score_heatmap, suggested_mutation, results, _, past_key_values = app.score_and_create_matrix_all_singles(seq, Tmodel, None, None, scoring_mirror=False, batch_size_inference=20, max_number_positions_per_heatmap=50, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, with_heatmap=False, past_key_values=past_key_values)
     
     results = results.sort_values(by=['avg_score'], ascending=False, ignore_index=True).head(max_length*2)
     extension = app.apply_gen_1extra(results)
-    prior, _ = app.score_multi_mutations(sequence=None, Tranception_model=Tmodel, extra_mutants=extension, mutation_range_start=None, mutation_range_end=None, scoring_mirror=False, batch_size_inference=20, max_number_positions_per_heatmap=50, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=True)
+    prior, _, past_key_values = app.score_multi_mutations(sequence=None, Tranception_model=Tmodel, extra_mutants=extension, mutation_range_start=None, mutation_range_end=None, scoring_mirror=False, batch_size_inference=20, max_number_positions_per_heatmap=50, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=True, past_key_values=past_key_values)
     
     child_priors = prior
     value_estimate = float(results['avg_score'].values[0])
     
-    return child_priors, value_estimate
+    return child_priors, value_estimate, past_key_values
 

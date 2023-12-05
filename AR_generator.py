@@ -68,6 +68,7 @@ mutants = []
 subsamplings = []
 samplingtheshold = []
 subsamplingtheshold = []
+past_key_values=None
 
 if args.sampling_method in ['top_k', 'top_p', 'typical', 'mirostat', 'beam_search']:
     assert args.sampling_threshold is not None, "Sampling threshold must be specified for top_k, top_p, typical, mirostat, and beam_search sampling methods"
@@ -92,7 +93,7 @@ while len(generated_sequence) < sequence_num:
         if args.sampling_method == 'mcts':
             sampling_strat = args.sampling_method
             sampling_threshold = args.max_length
-            mutation = AR_MCTS.UCT_search(seq, max_length=args.max_length, tokenizer=tokenizer, AA_vocab=AA_vocab, extension_factor=AA_extension, Tmodel=model)
+            mutation, past_key_values = AR_MCTS.UCT_search(seq, max_length=args.max_length, tokenizer=tokenizer, AA_vocab=AA_vocab, extension_factor=AA_extension, Tmodel=model, past_key_values=past_key_values)
             # print("MCTS mutation: ", mutation)
         
         else:
@@ -100,7 +101,7 @@ while len(generated_sequence) < sequence_num:
             extended_seq = app.extend_sequence_by_n(seq, AA_extension, AA_vocab, output_sequence=True)
 
             # Score using Tranception (app.score_multi_mutations works for scoring AR sequences)
-            scores, _ = app.score_multi_mutations(sequence=None,
+            scores, _, past_key_values = app.score_multi_mutations(sequence=None,
                                                         extra_mutants=extended_seq,
                                                         mutation_range_start=None, 
                                                         mutation_range_end=None, 
@@ -111,7 +112,8 @@ while len(generated_sequence) < sequence_num:
                                                         AA_vocab=AA_vocab, 
                                                         tokenizer=tokenizer,
                                                         AR_mode=True,
-                                                        Tranception_model=model,)
+                                                        Tranception_model=model,
+                                                        past_key_values=past_key_values)
 
             # Save scores
             if args.save_scores:
@@ -129,7 +131,7 @@ while len(generated_sequence) < sequence_num:
                 mutation = ARtop_k_sampling(scores, k=int(sampling_threshold), sampler=final_sampler)
             elif sampling_strat == 'beam_search':
                 assert args.max_length < seq_length, "Maximum length must be less than the length of the final sequence"
-                mutation = ARbeam_search(scores, beam_width=int(sampling_threshold), max_length=args.max_length, tokenizer=tokenizer, sampler=final_sampler, Tmodel=model)
+                mutation, past_key_values = ARbeam_search(scores, beam_width=int(sampling_threshold), max_length=args.max_length, tokenizer=tokenizer, sampler=final_sampler, Tmodel=model, past_key_values=past_key_values)
             elif sampling_strat == 'top_p':
                 assert float(sampling_threshold) <= 1.0 and float(sampling_threshold) > 0, "Top-p sampling threshold must be between 0 and 1"
                 mutation = ARtop_p_sampling(scores, p=float(sampling_threshold), sampler=final_sampler)

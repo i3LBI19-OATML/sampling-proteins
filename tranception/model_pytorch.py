@@ -877,7 +877,7 @@ class TranceptionLMHeadModel(GPT2PreTrainedModel):
             for layer_past in past
         )
     
-    def score_mutants(self, DMS_data, target_seq=None, scoring_mirror=True, batch_size_inference=10, num_workers=10, indel_mode=False):
+    def score_mutants(self, DMS_data, target_seq=None, scoring_mirror=True, batch_size_inference=10, num_workers=10, indel_mode=False, past_key_values=None):
         """
         Method to score mutants in an input DMS file.
         DMS_data: (dataframe) Dataframe containing the list of mutated sequences for scoring.
@@ -898,12 +898,12 @@ class TranceptionLMHeadModel(GPT2PreTrainedModel):
         else:
             df_left_to_right_slices = scoring_utils.get_sequence_slices(df, target_seq=list(df['mutated_sequence'])[0], model_context_len = self.config.n_ctx - 2, indel_mode=indel_mode, scoring_window='sliding')
         print("Scoring sequences from left to right")
-        scores_L_to_R = scoring_utils.get_tranception_scores_mutated_sequences(model=self, mutated_sequence_df=df_left_to_right_slices, batch_size_inference=batch_size_inference, score_var_name='avg_score_L_to_R', target_seq=target_seq, num_workers=num_workers, indel_mode=indel_mode)
+        scores_L_to_R, past_key_values = scoring_utils.get_tranception_scores_mutated_sequences(model=self, mutated_sequence_df=df_left_to_right_slices, batch_size_inference=batch_size_inference, score_var_name='avg_score_L_to_R', target_seq=target_seq, num_workers=num_workers, indel_mode=indel_mode, past_key_values=past_key_values)
         if scoring_mirror: 
             print("Scoring sequences from right to left")
             df_right_to_left_slices = df_left_to_right_slices.copy()
             df_right_to_left_slices['sliced_mutated_sequence'] = df_right_to_left_slices['sliced_mutated_sequence'].apply(lambda x: x[::-1])
-            scores_R_to_L = scoring_utils.get_tranception_scores_mutated_sequences(model=self, mutated_sequence_df=df_right_to_left_slices, batch_size_inference=batch_size_inference, score_var_name='avg_score_R_to_L', target_seq=target_seq, num_workers=num_workers, reverse=True, indel_mode=indel_mode)
+            scores_R_to_L, past_key_values = scoring_utils.get_tranception_scores_mutated_sequences(model=self, mutated_sequence_df=df_right_to_left_slices, batch_size_inference=batch_size_inference, score_var_name='avg_score_R_to_L', target_seq=target_seq, num_workers=num_workers, reverse=True, indel_mode=indel_mode, past_key_values=past_key_values)
             all_scores = pd.merge(scores_L_to_R, scores_R_to_L, on='mutated_sequence', how='left', suffixes=('','_R_to_L'))
             all_scores['avg_score'] = (all_scores['avg_score_L_to_R'] + all_scores['avg_score_R_to_L']) / 2.0
         else:
@@ -917,7 +917,7 @@ class TranceptionLMHeadModel(GPT2PreTrainedModel):
             else:
                 wt_row = pd.DataFrame([[target_seq,0,0]], columns=['mutated_sequence','avg_score_L_to_R','avg_score'])
             all_scores = pd.concat([all_scores,wt_row], ignore_index=True)
-        return all_scores
+        return all_scores, past_key_values
 
     def encode_batch(self, protein_sequence, sequence_name="sliced_mutated_sequence"):
         """

@@ -75,6 +75,7 @@ mutants = []
 subsamplings = []
 samplingtheshold = []
 subsamplingtheshold = []
+past_key_values=None
 
 if args.sampling_method in ['top_k', 'top_p', 'typical', 'mirostat', 'beam_search']:
     assert args.sampling_threshold is not None, "Sampling threshold must be specified for top_k, top_p, and mirostat sampling methods"
@@ -86,15 +87,6 @@ while len(generated_sequence) < sequence_num:
     iteration = 0
     seq = args.sequence
     sequence_id = args.seq_id
-    # if args.sequence == 'mdh_esm':
-    #     seq = example_sequence.get('MDH_A0A075B5H0')
-    #     sequence_id = 'MDH_A0A075B5H0'
-    # elif args.sequence == 'mdh_esm_2':
-    #     seq = example_sequence.get('MDH_A0A2V9QQ45')
-    #     sequence_id = 'MDH_A0A2V9QQ45'
-    # elif args.sequence == 'avGFP':
-    #     seq = example_sequence.get('avGFP')
-    #     sequence_id = 'avGFP'
     start_time = time.time()
     mutation_history = []
 
@@ -103,12 +95,12 @@ while len(generated_sequence) < sequence_num:
         print("=========================================")
 
         if args.sampling_method == 'mcts':
-            mutation = MCTS.UCT_search(seq, max_length=args.max_length, extra=1, tokenizer=tokenizer, AA_vocab=AA_vocab, Tmodel=model)
+            mutation, past_key_values = MCTS.UCT_search(seq, max_length=args.max_length, extra=1, tokenizer=tokenizer, AA_vocab=AA_vocab, Tmodel=model, past_key_values=past_key_values)
             sampling_strat = args.sampling_method
             sampling_threshold = args.max_length
         else:
             # 1. Get scores of suggested mutation
-            score_heatmap, suggested_mutation, scores, _ = app.score_and_create_matrix_all_singles(seq, Tranception_model=model, 
+            score_heatmap, suggested_mutation, scores, _, past_key_values = app.score_and_create_matrix_all_singles(seq, Tranception_model=model, 
                                                                                         mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
                                                                                         scoring_mirror=args.use_scoring_mirror, 
                                                                                         batch_size_inference=args.batch, 
@@ -116,7 +108,8 @@ while len(generated_sequence) < sequence_num:
                                                                                         num_workers=args.num_workers, 
                                                                                         AA_vocab=AA_vocab, 
                                                                                         tokenizer=tokenizer,
-                                                                                        with_heatmap=args.with_heatmap)
+                                                                                        with_heatmap=args.with_heatmap,
+                                                                                        past_key_values=past_key_values)
 
             # Save heatmap
             if args.with_heatmap and args.save_scores:
@@ -138,7 +131,7 @@ while len(generated_sequence) < sequence_num:
             if sampling_strat == 'top_k':
                 mutation = top_k_sampling(scores, k=int(sampling_threshold), sampler=final_sampler)
             elif sampling_strat == 'beam_search':
-                mutation = beam_search(scores, beam_width=int(sampling_threshold), max_length=args.max_length, tokenizer=tokenizer, sampler=final_sampler, Tmodel=model)
+                mutation, past_key_values = beam_search(scores, beam_width=int(sampling_threshold), max_length=args.max_length, tokenizer=tokenizer, sampler=final_sampler, Tmodel=model, past_key_values=past_key_values)
             elif sampling_strat == 'top_p':
                 assert float(sampling_threshold) <= 1.0 and float(sampling_threshold) > 0, "Top-p sampling threshold must be between 0 and 1"
                 mutation = top_p_sampling(scores, p=float(sampling_threshold), sampler=final_sampler)

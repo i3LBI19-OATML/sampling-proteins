@@ -74,7 +74,7 @@ def sequence_replace(sequences, char_to_replace, char_replacements):
     """
     return [sequence_replace_single(sequence, char_to_replace, char_replacements) for sequence in sequences]
 
-def get_tranception_scores_mutated_sequences(model, mutated_sequence_df, batch_size_inference, score_var_name, target_seq, num_workers=10, reverse=False, indel_mode=False):
+def get_tranception_scores_mutated_sequences(model, mutated_sequence_df, batch_size_inference, score_var_name, target_seq, num_workers=10, reverse=False, indel_mode=False, past_key_values=None):
     """
     Helper function that takes as input a set of mutated sequences (in a pandas dataframe) and returns scores for each mutation.
     If target_seq is not None, returns the delta log likelihood wrt that target sequence -- otherwise returns the log likelihood of the protein sequences.
@@ -114,11 +114,15 @@ def get_tranception_scores_mutated_sequences(model, mutated_sequence_df, batch_s
                 encoded_batch['start_slice']=window_start
                 encoded_batch['end_slice']=window_end
                 encoded_batch['mutated_sequence'] = mutated_sequence #only mutated_sequence is flipped if the scoring_mirror branch of score_mutants. No need to flip mutated_sequence for MSA re-aligning
-                fused_shift_log_probas=model(**encoded_batch,return_dict=True).fused_shift_log_probas
+                model_outputs = model(**encoded_batch,return_dict=True,past_key_values=past_key_values,use_cache=True)
+                past_key_values=model_outputs.past_key_values
+                fused_shift_log_probas=model_outputs.fused_shift_log_probas
                 loss_fct = NLLLoss(reduction='none')
                 loss = - loss_fct(input=fused_shift_log_probas.view(-1, fused_shift_log_probas.size(-1)), target=shift_labels.view(-1)).view(fused_shift_log_probas.shape[0],fused_shift_log_probas.shape[1])
             else:
-                lm_logits=model(**encoded_batch,return_dict=True).logits
+                model_outputs = model(**encoded_batch,return_dict=True,past_key_values=past_key_values,use_cache=True)
+                lm_logits=model_outputs.logits
+                past_key_values=model_outputs.past_key_values
                 shift_logits = lm_logits[..., :-1, :].contiguous()
                 loss_fct = CrossEntropyLoss(reduction='none') 
                 loss = - loss_fct(input=shift_logits.view(-1, shift_logits.size(-1)), target=shift_labels.view(-1)).view(shift_logits.shape[0],shift_logits.shape[1])
@@ -144,10 +148,10 @@ def get_tranception_scores_mutated_sequences(model, mutated_sequence_df, batch_s
         elif model.config.scoring_window=="sliding":
             delta_scores = scores_mutated_seq.copy()
             delta_scores[score_var_name] = delta_scores['score'] - list(scores_wt['score'])[0] # In sliding mode there is a single reference window for the WT
-        return delta_scores[['mutated_sequence',score_var_name]]
+        return delta_scores[['mutated_sequence',score_var_name]], past_key_values
     else:
         scores[score_var_name] = scores['score']
-        return scores[['mutated_sequence',score_var_name]]
+        return scores[['mutated_sequence',score_var_name]], past_key_values
 
 def get_sequence_slices(df, target_seq, model_context_len, start_idx=1, scoring_window="optimal", indel_mode=False):
     """

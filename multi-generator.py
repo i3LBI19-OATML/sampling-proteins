@@ -87,6 +87,7 @@ subsamplings = []
 mutants = []
 samplingthreshold = []
 subsamplingthreshold = []
+past_key_values=None
 
 if args.sampling_method in ['top_k', 'top_p', 'typical', 'mirostat']:
     assert args.sampling_threshold is not None, "Sampling threshold must be specified for top_k, top_p, and mirostat sampling methods"
@@ -148,7 +149,7 @@ while len(generated_sequence) < sequence_num:
             # First Mutation
             if mutation_count == 1:
                 # 1. Generate and score suggested mutation
-                score_heatmap, suggested_mutation, scores, _ = app.score_and_create_matrix_all_singles(seq, Tranception_model=model, 
+                score_heatmap, suggested_mutation, scores, _, past_key_values = app.score_and_create_matrix_all_singles(seq, Tranception_model=model, 
                                                                                             mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
                                                                                             scoring_mirror=args.use_scoring_mirror, 
                                                                                             batch_size_inference=args.batch, 
@@ -156,7 +157,8 @@ while len(generated_sequence) < sequence_num:
                                                                                             num_workers=args.num_workers, 
                                                                                             AA_vocab=AA_vocab, 
                                                                                             tokenizer=tokenizer,
-                                                                                            with_heatmap=args.with_heatmap)
+                                                                                            with_heatmap=args.with_heatmap,
+                                                                                            past_key_values=past_key_values)
 
                 # 2. Define intermediate sampling threshold
                 final_sampler = temperature_sampler(args.temperature)
@@ -183,10 +185,10 @@ while len(generated_sequence) < sequence_num:
                     mutation = top_k_sampling(last_mutation_round_DMS, k=int(100), sampler=final_sampler, multi=True)
                     all_extra_mutants = app.apply_gen_1extra(DMS=mutation)
                     trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
-                    # _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=all_extra_mutants,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
+                    # _, scored_trimmed, trimmed, past_key_values = app.score_multi_mutations(seq,extra_mutants=all_extra_mutants,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
                     #                                         scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
                     #                                         max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
-                    #                                         AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
+                    #                                         AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model, past_key_values=past_key_values)
                     # extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)[['mutant', 'mutated_sequence']]
                     extra_mutants = trimmed.sample(n=intermediate_sampling_threshold)
 
@@ -204,7 +206,7 @@ while len(generated_sequence) < sequence_num:
                 print(f"Using {len(extra_mutants)} variants for scoring")
 
                 # 3. Get scores of sampled mutation
-                suggested_mutation, scores, _ = app.score_multi_mutations(seq,
+                suggested_mutation, scores, _, past_key_values = app.score_multi_mutations(seq,
                                                                         extra_mutants=extra_mutants,
                                                                         mutation_range_start=mutation_start, 
                                                                         mutation_range_end=mutation_end, 
@@ -214,7 +216,8 @@ while len(generated_sequence) < sequence_num:
                                                                         num_workers=args.num_workers, 
                                                                         AA_vocab=AA_vocab, 
                                                                         tokenizer=tokenizer,
-                                                                        Tranception_model=model)
+                                                                        Tranception_model=model,
+                                                                        past_key_values=past_key_values)
 
                 # 4. Define intermediate sampling threshold
                 final_sampler = temperature_sampler(args.temperature)
@@ -240,10 +243,10 @@ while len(generated_sequence) < sequence_num:
                     mutation = top_k_sampling(last_mutation_round_DMS, k=int(100), sampler=final_sampler, multi=True)
                     all_extra_mutants = app.apply_gen_1extra(DMS=mutation)
                     trimmed = app.trim_DMS(DMS_data=all_extra_mutants, sampled_mutants=mutation, mutation_rounds=mutation_count)
-                    # _, scored_trimmed, trimmed = app.score_multi_mutations(seq,extra_mutants=all_extra_mutants,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
+                    # _, scored_trimmed, trimmed, past_key_values = app.score_multi_mutations(seq,extra_mutants=all_extra_mutants,mutation_range_start=mutation_start, mutation_range_end=mutation_end, 
                     #                                         scoring_mirror=args.use_scoring_mirror, batch_size_inference=args.batch, 
                     #                                         max_number_positions_per_heatmap=args.max_pos, num_workers=args.num_workers, 
-                    #                                         AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model)
+                    #                                         AA_vocab=AA_vocab, tokenizer=tokenizer, Tranception_model=model, past_key_values=past_key_values)
                     # extra_mutants = top_k_sampling(scored_trimmed, k=intermediate_sampling_threshold, sampler=final_sampler, multi=True)[['mutant', 'mutated_sequence']]
                     extra_mutants = trimmed.sample(n=intermediate_sampling_threshold)
 
@@ -261,7 +264,7 @@ while len(generated_sequence) < sequence_num:
                 print(f"Using {len(extra_mutants)} variants for scoring")
 
                 # 3. Get scores of sampled mutation
-                suggested_mutation, scores, _ = app.score_multi_mutations(seq,
+                suggested_mutation, scores, _, past_key_values = app.score_multi_mutations(seq,
                                                                         extra_mutants=extra_mutants,
                                                                         mutation_range_start=mutation_start, 
                                                                         mutation_range_end=mutation_end, 
@@ -271,7 +274,8 @@ while len(generated_sequence) < sequence_num:
                                                                         num_workers=args.num_workers, 
                                                                         AA_vocab=AA_vocab, 
                                                                         tokenizer=tokenizer,
-                                                                        Tranception_model=model)
+                                                                        Tranception_model=model,
+                                                                        past_key_values=past_key_values)
 
                 # 4. Final Sampling mutation from suggested mutation scores
                 final_sampler = temperature_sampler(args.temperature)

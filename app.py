@@ -219,7 +219,7 @@ def get_mutated_protein(sequence,mutant):
     mutated_sequence[position-1]=to_AA
   return ''.join(mutated_sequence)
 
-def score_and_create_matrix_all_singles(sequence, Tranception_model, mutation_range_start=None,mutation_range_end=None,scoring_mirror=False,batch_size_inference=20,max_number_positions_per_heatmap=50,num_workers=0,AA_vocab=AA_vocab, tokenizer=tokenizer, with_heatmap=True):
+def score_and_create_matrix_all_singles(sequence, Tranception_model, mutation_range_start=None,mutation_range_end=None,scoring_mirror=False,batch_size_inference=20,max_number_positions_per_heatmap=50,num_workers=0,AA_vocab=AA_vocab, tokenizer=tokenizer, with_heatmap=True, past_key_values=None):
   if mutation_range_start is None: mutation_range_start=1
   if mutation_range_end is None: mutation_range_end=len(sequence)
   assert len(sequence) > 0, "no sequence entered"
@@ -244,12 +244,13 @@ def score_and_create_matrix_all_singles(sequence, Tranception_model, mutation_ra
   model.config.tokenizer = tokenizer
   all_single_mutants = create_all_single_mutants(sequence,AA_vocab,mutation_range_start,mutation_range_end)
   print("Single variants generated")
-  scores = model.score_mutants(DMS_data=all_single_mutants, 
+  scores, past_key_values = model.score_mutants(DMS_data=all_single_mutants, 
                                     target_seq=sequence, 
                                     scoring_mirror=scoring_mirror, 
                                     batch_size_inference=batch_size_inference,  
                                     num_workers=num_workers, 
-                                    indel_mode=False
+                                    indel_mode=False,
+                                    past_key_values=past_key_values
                                     )
   print("Single scores computed")
   scores = pd.merge(scores,all_single_mutants,on="mutated_sequence",how="left")
@@ -266,9 +267,9 @@ def score_and_create_matrix_all_singles(sequence, Tranception_model, mutation_ra
       score_heatmaps.append(create_scoring_matrix_visual(scores,sequence,image_index,window_start,window_end,AA_vocab))
       window_start += max_number_positions_per_heatmap
       window_end = min(mutation_range_end,window_start+max_number_positions_per_heatmap-1)
-  return score_heatmaps, suggest_mutations(scores), scores, all_single_mutants
+  return score_heatmaps, suggest_mutations(scores), scores, all_single_mutants, past_key_values
 
-def score_multi_mutations(sequence:str, extra_mutants:pd.DataFrame, Tranception_model, mutation_range_start=None,mutation_range_end=None,scoring_mirror=False,batch_size_inference=20,max_number_positions_per_heatmap=50,num_workers=0,AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=False):
+def score_multi_mutations(sequence:str, extra_mutants:pd.DataFrame, Tranception_model, mutation_range_start=None,mutation_range_end=None,scoring_mirror=False,batch_size_inference=20,max_number_positions_per_heatmap=50,num_workers=0,AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=False, past_key_values=None):
   if sequence is not None:
     if mutation_range_start is None: mutation_range_start=1
     if mutation_range_end is None: mutation_range_end=len(sequence)
@@ -292,12 +293,13 @@ def score_multi_mutations(sequence:str, extra_mutants:pd.DataFrame, Tranception_
   else:
     print("Inference will take place on CPU")
   model.config.tokenizer = tokenizer
-  scores = model.score_mutants(DMS_data=extra_mutants, 
+  scores, past_key_values = model.score_mutants(DMS_data=extra_mutants, 
                                     target_seq=sequence, 
                                     scoring_mirror=scoring_mirror, 
                                     batch_size_inference=batch_size_inference,  
                                     num_workers=num_workers, 
-                                    indel_mode=False
+                                    indel_mode=False,
+                                    past_key_values=past_key_values
                                     )
   print("Scoring done")
   scores = pd.merge(scores,extra_mutants,on="mutated_sequence",how="left")
@@ -305,9 +307,9 @@ def score_multi_mutations(sequence:str, extra_mutants:pd.DataFrame, Tranception_
   # scores["target_AA"] = scores["mutant"].map(lambda x: x[-1])
   # print(f'score col: {scores.columns}')
   if AR_mode:
-    return scores, extra_mutants
+    return scores, extra_mutants, past_key_values
   else:
-    return suggest_mutations(scores, multi=True), scores, extra_mutants
+    return suggest_mutations(scores, multi=True), scores, extra_mutants, past_key_values
 
 def extract_sequence(example):
   label, taxon, sequence = example
