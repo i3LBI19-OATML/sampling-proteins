@@ -134,15 +134,6 @@ while len(generated_sequence) < sequence_num:
     iteration = 0
     seq = args.sequence
     sequence_id = args.seq_id
-    # if args.sequence == 'mdh_esm':
-    #     seq = example_sequence.get('MDH_A0A075B5H0')
-    #     sequence_id = 'MDH_A0A075B5H0'
-    # elif args.sequence == 'mdh_esm_2':
-    #     seq = example_sequence.get('MDH_A0A2V9QQ45')
-    #     sequence_id = 'MDH_A0A2V9QQ45'
-    # elif args.sequence == 'avGFP':
-    #     seq = example_sequence.get('avGFP')
-    #     sequence_id = 'avGFP'
     start_time = time.time()
     mutation_history = []
 
@@ -202,9 +193,7 @@ while len(generated_sequence) < sequence_num:
                 if args.use_rsf:
                     mutation = top_k_sampling(last_mutation_round_DMS, k=int(100), sampler=final_sampler, multi=True)
                     all_extra_mutants = app.apply_gen_1extra(DMS=mutation)
-                    # print(f'col: {all_extra_mutants.columns}\nall extra: {all_extra_mutants}')
                     ev_scored = app.predict_evmutation(DMS=all_extra_mutants, top_n=len(all_extra_mutants), ev_model=ev_model, return_evscore=True)
-                    # print(f'ev_scored col: {ev_scored.columns}\nev_scored: {ev_scored}')
                     extra_mutants = app.stratified_filtering(ev_scored, threshold=intermediate_sampling_threshold, column_name='EVmutation')
 
                 if args.use_ams:
@@ -261,9 +250,7 @@ while len(generated_sequence) < sequence_num:
                 if args.use_rsf:
                     mutation = top_k_sampling(last_mutation_round_DMS, k=int(100), sampler=final_sampler, multi=True)
                     all_extra_mutants = app.apply_gen_1extra(DMS=mutation)
-                    # print(f'col: {all_extra_mutants.columns}\nall extra: {all_extra_mutants}')
                     ev_scored = app.predict_evmutation(DMS=all_extra_mutants, top_n=len(all_extra_mutants), ev_model=ev_model, return_evscore=True)
-                    # print(f'ev_scored col: {ev_scored.columns}\nev_scored: {ev_scored}')
                     extra_mutants = app.stratified_filtering(ev_scored, threshold=intermediate_sampling_threshold, column_name='EVmutation')
 
                 if args.use_ams:
