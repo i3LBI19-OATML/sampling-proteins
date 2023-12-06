@@ -115,18 +115,19 @@ def get_tranception_scores_mutated_sequences(model, mutated_sequence_df, batch_s
                 encoded_batch['end_slice']=window_end
                 encoded_batch['mutated_sequence'] = mutated_sequence #only mutated_sequence is flipped if the scoring_mirror branch of score_mutants. No need to flip mutated_sequence for MSA re-aligning
                 model_outputs = model(**encoded_batch,return_dict=True,past_key_values=past_key_values,use_cache=True)
-                past_key_values=model_outputs.past_key_values
+                past_key_values=None #model_outputs.past_key_values #TODO: implement caching for LM
                 fused_shift_log_probas=model_outputs.fused_shift_log_probas
                 loss_fct = NLLLoss(reduction='none')
                 loss = - loss_fct(input=fused_shift_log_probas.view(-1, fused_shift_log_probas.size(-1)), target=shift_labels.view(-1)).view(fused_shift_log_probas.shape[0],fused_shift_log_probas.shape[1])
             else:
                 model_outputs = model(**encoded_batch,return_dict=True,past_key_values=past_key_values,use_cache=True)
                 lm_logits=model_outputs.logits
-                past_key_values=model_outputs.past_key_values
+                past_key_values=None #model_outputs.past_key_values #TODO: implement caching for LM
                 shift_logits = lm_logits[..., :-1, :].contiguous()
                 loss_fct = CrossEntropyLoss(reduction='none') 
                 loss = - loss_fct(input=shift_logits.view(-1, shift_logits.size(-1)), target=shift_labels.view(-1)).view(shift_logits.shape[0],shift_logits.shape[1])
             mask = encoded_batch['attention_mask'][..., 1:].float()
+            # prior_attention_mask = encoded_batch['attention_mask'] #TODO: implement caching for LM
             mask[mask==0]=float('nan')
             loss *= mask
             loss =  nansum(loss, dim=1)
