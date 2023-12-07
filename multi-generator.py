@@ -29,7 +29,7 @@ parser.add_argument('--save_scores', action='store_true', help='Whether to save 
 
 parser.add_argument('--sampling_method', type=str, choices=['top_k', 'top_p', 'typical', 'mirostat', 'random', 'greedy'], required=True, help='Sampling method')
 parser.add_argument('--sampling_threshold', type=float, help='Sampling threshold (k for top_k, p for top_p, tau for mirostat, etc.)')
-parser.add_argument('--intermediate_threshold', type=int, required=True, help='Top-K threshold for intermediate sampling')
+parser.add_argument('--intermediate_threshold', type=int, required=True, help='Final Top-K threshold for intermediate sampling')
 parser.add_argument('--use_qff', action='store_true', help='Whether to use Quantitative-Function Filtering')
 parser.add_argument('--use_hpf', action='store_true', help='Whether to use High-Probability Filtering')
 parser.add_argument('--use_rsf', action='store_true', help='Whether to use Random-Stratified Filtering')

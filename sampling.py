@@ -159,7 +159,7 @@ def random_sampling(scores: pd.DataFrame, sampler = temperature_sampler(temperat
     return scores['mutant'][sampled_score]
 
 
-def beam_search(scores: pd.DataFrame, beam_width: int, max_length:int, tokenizer, Tmodel, score_mirror=False, batch=20, max_pos=50, sampler=temperature_sampler(temperature=1.0), multi=False, past_key_values=None):
+def beam_search(scores: pd.DataFrame, beam_width: int, max_length:int, tokenizer, Tmodel, score_mirror=False, batch=20, max_pos=50, sampler=temperature_sampler(temperature=1.0), multi=False, past_key_values=None, filter='hpf', ev_model=None, IST=96):
   length = 1
   while length < max_length:
     # Get top k mutations
@@ -167,10 +167,27 @@ def beam_search(scores: pd.DataFrame, beam_width: int, max_length:int, tokenizer
     scores = top_k_sampling(scores, k=beam_width, sampler=sampler, multi=True)
     # Extend each mutation by one
     levels = app.apply_gen_1extra(scores)
+    length += 1
+    # Filter the results
+    assert filter in ['hpf', 'qff', 'ams'], "Filter must be one of 'hpf', 'qff', or 'ams'"
+    if filter == 'hpf':
+      print("Filtering MCTS with HPF")
+      trimmed = app.trim_DMS(DMS_data=levels, sampled_mutants=scores, mutation_rounds=length)
+      levels = trimmed.sample(n=IST)
+
+    if filter == 'qff':
+      print("Filtering MCTS with QFF")
+      assert ev_model is not None, "ev_model must be provided for QFF filter"
+      levels = app.predict_evmutation(DMS=levels, top_n=IST, ev_model=ev_model)
+
+    if filter == 'ams':
+      print("Filtering MCTS with AMS")
+      assert ev_model is not None, "ev_model must be provided for AMS filter"
+      att_mutations = app.get_attention_mutants(DMS=levels, Tranception_model=Tmodel, focus='highest', top_n=5) #top_n is the number of attention positions to focus on
+      levels = app.predict_evmutation(DMS=att_mutations, top_n=IST, ev_model=ev_model)
 
     # Score each mutation
     scores, _, past_key_values = app.score_multi_mutations(sequence=None, extra_mutants=levels, Tranception_model=Tmodel, scoring_mirror=score_mirror, batch_size_inference=batch, max_number_positions_per_heatmap=max_pos, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=True, past_key_values=past_key_values)
-    length += 1
   if length == max_length:
     scores = top_k_sampling(scores, k=1, sampler=sampler, multi=True)
     if multi:
