@@ -9,6 +9,7 @@ import util
 from sampling import top_k_sampling, temperature_sampler, top_p_sampling, typical_sampling, mirostat_sampling, random_sampling, beam_search
 import time
 import MCTS
+from EVmutation.model import CouplingsModel
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--sequence', type=str, help='Sequence to do mutation or DE', required=True)
