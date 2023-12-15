@@ -62,11 +62,11 @@ def UCT_search(state, max_length, tokenizer, Tmodel, AA_vocab=AA_vocab, extensio
   root = UCTNode(state)
   for _ in range(max_length):
     leaf = root.select_leaf()
-    child_priors, value_estimate = Evaluate(leaf.state, tokenizer, AA_vocab, Tmodel, extension_factor, past_key_values=past_key_values)
+    child_priors, value_estimate, past_key_values = Evaluate(leaf.state, tokenizer, AA_vocab, Tmodel, extension_factor, past_key_values=past_key_values)
     leaf.expand(child_priors)
     leaf.backup(value_estimate)
     output = max(root.children.items(), key=lambda item: item[1].number_visits)
-  return output[1].state
+  return output[1].state, past_key_values
 
 def Evaluate(seq, tokenizer, AA_vocab, Tmodel, extension_factor=1, past_key_values=None):
     df_seq = pd.DataFrame.from_dict({'mutated_sequence': [seq]})
