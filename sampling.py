@@ -165,17 +165,18 @@ def beam_search(scores: pd.DataFrame, beam_width: int, max_length:int, tokenizer
     # Get top k mutations
     assert beam_width <= len(scores), "Beam width must be less than or equal to the number of mutations ({}).".format(len(scores))
     scores = top_k_sampling(scores, k=beam_width, sampler=sampler, multi=True)
-    # Extend each mutation by one
-    levels = app.apply_gen_1extra(scores)
     length += 1
-    # Filter the results
+
+    # Extend and filter the results
     assert filter in ['hpf', 'qff', 'ams'], "Filter must be one of 'hpf', 'qff', or 'ams'"
     if filter == 'hpf':
+      levels = app.apply_gen_1extra(scores)
       print("Filtering MCTS with HPF")
       trimmed = app.trim_DMS(DMS_data=levels, sampled_mutants=scores, mutation_rounds=length)
       levels = trimmed.sample(n=IST)
 
     if filter == 'qff':
+      levels = app.apply_gen_1extra(scores)
       print("Filtering MCTS with QFF")
       assert ev_model is not None, "ev_model must be provided for QFF filter"
       levels = app.predict_evmutation(DMS=levels, top_n=IST, ev_model=ev_model)
@@ -183,7 +184,7 @@ def beam_search(scores: pd.DataFrame, beam_width: int, max_length:int, tokenizer
     if filter == 'ams':
       print("Filtering MCTS with AMS")
       assert ev_model is not None, "ev_model must be provided for AMS filter"
-      att_mutations = app.get_attention_mutants(DMS=levels, Tranception_model=Tmodel, focus='highest', top_n=5) #top_n is the number of attention positions to focus on
+      att_mutations = app.get_attention_mutants(DMS=scores, Tranception_model=Tmodel, focus='highest', top_n=5) #top_n is the number of attention positions to focus on
       levels = app.predict_evmutation(DMS=att_mutations, top_n=IST, ev_model=ev_model)
 
     # Score each mutation

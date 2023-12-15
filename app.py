@@ -376,7 +376,7 @@ def get_attention_mutants(DMS, Tranception_model, focus='highest', top_n = 5, AA
   # raise NotImplementedError
   os.environ["TOKENIZERS_PARALLELISM"] = "false"
   new_mutations = []
-  for idx, row in tqdm.tqdm(DMS.iterrows(), total=len(DMS)):
+  for idx, row in tqdm.tqdm(DMS.iterrows(), total=len(DMS), desc=f'Getting attention mutants'):
     sequence = row['mutated_sequence']
     mutant = row['mutant']
 
@@ -427,7 +427,11 @@ def process_prompt_protxlnet(s):
   return s
 
 def stratified_filtering(DMS, threshold, column_name='EVmutation'):
-  DMS['strata'] = pd.qcut(DMS[column_name], q=4, labels=['very low', 'low', 'high', 'very high'])
+  try:
+    DMS['strata'] = pd.qcut(DMS[column_name], q=4, labels=['very low', 'low', 'high', 'very high'])
+  except IndexError:
+    print(f'Indexing Error: {column_name} may not be scored properly')
+    return DMS[['mutant', 'mutated_sequence']].reset_index(drop=True).sample(n=threshold)
   if threshold >= 4:
     threshold = threshold // 4
   elif threshold < 4:

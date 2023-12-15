@@ -77,27 +77,28 @@ def Evaluate(seq, extra, tokenizer, AA_vocab, max_length, Tmodel, past_key_value
     score_heatmap, suggested_mutation, results, _, past_key_values = app.score_and_create_matrix_all_singles(seq, Tmodel, None, None, scoring_mirror=False, batch_size_inference=20, max_number_positions_per_heatmap=50, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, with_heatmap=False, past_key_values=past_key_values)
     mutation_count = 1
     
-    # Extend the results
+    # Get top k mutations
     results = results.sort_values(by=['avg_score'], ascending=False, ignore_index=True).head(max_length)
-    extension = app.apply_gen_1extra(results)
     mutation_count += 1
 
-    # Filter the results
+    # Extend and filter the results
     assert filter in ['hpf', 'qff', 'ams'], "Filter must be one of 'hpf', 'qff', or 'ams'"
     if filter == 'hpf':
       print("Filtering MCTS with HPF")
+      extension = app.apply_gen_1extra(results)
       trimmed = app.trim_DMS(DMS_data=extension, sampled_mutants=results, mutation_rounds=mutation_count)
       extension = trimmed.sample(n=IST)
 
     if filter == 'qff':
       print("Filtering MCTS with QFF")
+      extension = app.apply_gen_1extra(results)
       assert ev_model is not None, "ev_model must be provided for QFF filter"
       extension = app.predict_evmutation(DMS=extension, top_n=IST, ev_model=ev_model)
 
     if filter == 'ams':
       print("Filtering MCTS with AMS")
       assert ev_model is not None, "ev_model must be provided for AMS filter"
-      att_mutations = app.get_attention_mutants(DMS=extension, Tranception_model=Tmodel, focus='highest', top_n=5) #top_n is the number of attention positions to focus on
+      att_mutations = app.get_attention_mutants(DMS=results, Tranception_model=Tmodel, focus='highest', top_n=5) #top_n is the number of attention positions to focus on
       extension = app.predict_evmutation(DMS=att_mutations, top_n=IST, ev_model=ev_model)
 
 
