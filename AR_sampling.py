@@ -168,7 +168,7 @@ def ARrandom_sampling(scores: pd.DataFrame, sampler = ARtemperature_sampler(temp
   else:
     return scores['mutated_sequence'][sampled_score]
 
-def ARbeam_search(scores: pd.DataFrame, beam_width: int, max_length:int, tokenizer, Tmodel, score_mirror=False, batch=20, max_pos=50, sampler=ARtemperature_sampler(temperature=1.0), multi=False, past_key_values=None):
+def ARbeam_search(scores: pd.DataFrame, beam_width: int, max_length:int, tokenizer, Tmodel, score_mirror=False, batch=20, max_pos=50, sampler=ARtemperature_sampler(temperature=1.0), multi=False, past_key_values=None, extension_factor=1):
   length = 1
   while length < max_length:
     # Get top k mutations
@@ -177,7 +177,7 @@ def ARbeam_search(scores: pd.DataFrame, beam_width: int, max_length:int, tokeniz
     # Extend each mutation by one
     levels = pd.DataFrame(columns=['mutated_sequence'])
     for i, row in scores.iterrows():
-      extension = app.extend_sequence_by_n(row['mutated_sequence'], 1, AA_vocab, output_sequence=True)
+      extension = app.extend_sequence_by_n(row['mutated_sequence'], extension_factor, AA_vocab, output_sequence=True)
       levels = pd.concat([levels, extension], ignore_index=True)
     # Score each mutation
     scores, _, past_key_values = app.score_multi_mutations(sequence=None, extra_mutants=levels, scoring_mirror=score_mirror, batch_size_inference=batch, max_number_positions_per_heatmap=max_pos, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=True, Tranception_model=Tmodel, past_key_values=past_key_values)
