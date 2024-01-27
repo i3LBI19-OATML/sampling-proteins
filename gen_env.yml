@@ -15,6 +15,7 @@ dependencies:
   - accelerate
   - biopython=1.82
   - datasets=1.18.3
+  - setuptools=69.0.3 #68.2.2
   - sentencepiece
   - numba
   - tqdm
@@ -23,3 +24,4 @@ dependencies:
   - safetensors
   - pip:
       - -e ./protein_bert/
+      - pandas==2.0.2

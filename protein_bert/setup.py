@@ -19,7 +19,7 @@ setup(
         'tensorflow<2.12',
         'tensorflow_addons',
         'numpy',
-        'pandas',
+        # 'pandas',
         'h5py',
         'lxml',
         'pyfaidx',
