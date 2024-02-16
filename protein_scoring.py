@@ -1,5 +1,5 @@
 device = 'cuda:0'
-
+import random
 from glob import glob
 from pgen.utils import parse_fasta
 import pandas as pd
@@ -11,9 +11,11 @@ from scoring_metrics import structure_metrics as st_metrics
 from scoring_metrics import single_sequence_metrics as ss_metrics
 from scoring_metrics import alignment_based_metrics as ab_metrics
 from scoring_metrics import fid_score as fid
+import time
 
 #Reset calculated metrics (creates a new datastructure to store results, clearing any existing results)
 results = dict()
+start_time = time.time()
 
 # Default directories
 file_dir = os.path.dirname(os.path.realpath(__file__))
@@ -116,10 +118,23 @@ print(f"Using random ID {rand_id} for temporary files")
 #concatenate reference sequences
 # Reference sequences
 reference_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/reference_seqs_{rand_id}.fasta")
-with open(reference_seqs_file,"w") as fh:
+full_reference_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/full_reference_seqs_{rand_id}.fasta")
+
+n = 400  # default value for quick analysis; replace with the number of sequences you want
+sequences = []
+
+with open(full_reference_seqs_file,"w") as fh:
   for reference_fasta in reference_files:
     for name, seq in zip(*parse_fasta(reference_fasta, return_names=True, clean="unalign")):
       print(f">{name}\n{seq}", file=fh)
+      sequences.append((name, seq))
+
+sample_size = min(n, len(sequences))
+selected_sequences = random.sample(sequences, sample_size)
+print(f"Selected {sample_size} sequences from {len(sequences)} sequences")
+with open(reference_seqs_file,"w") as fh:
+    for name, seq in selected_sequences:
+        print(f">{name}\n{seq}", file=fh)
 
 # Target sequences
 target_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/target_seqs_{rand_id}.fasta")
@@ -128,13 +143,8 @@ with open(target_seqs_file,"w") as fh:
     for name, seq in zip(*parse_fasta(target_fasta, return_names=True, clean="unalign")):
       print(f">{name}\n{seq}", file=fh)
 
-if not args.skip_FID:
-  fretchet_score = fid.calculate_fid_given_paths(target_seqs_file, reference_seqs_file, device)
-else:
-  fretchet_score = None
-
+alignment_time = time.time()
 ab_metrics.ESM_MSA(target_seqs_file, reference_seqs_file, results)
-# try:
 ab_metrics.substitution_score(target_seqs_file, reference_seqs_file,
                               substitution_matrix=sub_matrix, 
                               Substitution_matrix_score_mean_of_mutated_positions=score_mean, 
@@ -142,9 +152,7 @@ ab_metrics.substitution_score(target_seqs_file, reference_seqs_file,
                               results=results,
                               gap_open=sub_gap_open,
                               gap_extend=sub_gap_extend,)
-#   identity_score = True
-# except:
-#   identity_score = False
+print(f"Alignment-based metrics took {time.time() - alignment_time} seconds")
 
 if args.use_evmutation:
   ab_metrics.EVmutation(target_files=target_files, orig_seq=args.orig_seq.upper(), results=results, model_params=args.model_params)
@@ -158,20 +166,29 @@ repeat_score['repeat_2'] = args.remove_repeat_score_2
 repeat_score['repeat_3'] = args.remove_repeat_score_3
 repeat_score['repeat_4'] = args.remove_repeat_score_4
 
+single_time = time.time()
 ss_metrics.CARP_640m_logp(target_seqs_file, results, device)
-ss_metrics.ESM_1v(target_files, results, device)
+esm1v_pred = ss_metrics.ESM_1v(target_files, results, device, return_pred=True)
 ss_metrics.ESM_1v_mask6(target_files, results, device)
 ss_metrics.Repeat(target_files, repeat_score, results)
 if args.use_tranception:
   past_key_values = None
   past_key_values = ss_metrics.Tranception(target_files=target_files, orig_seq=args.orig_seq.upper(), results=results, device=device, model_type="Large", local_model=os.path.expanduser("~/Tranception_Large"))
+print(f"Single sequence metrics took {time.time() - single_time} seconds")
 
 # Download results
 df = pd.DataFrame.from_dict(results, orient="index")
-df["FID"] = fretchet_score
+if not args.skip_FID:
+  fid_time = time.time()
+  fretchet_score = fid.calculate_fid_given_paths(esm1v_pred, full_reference_seqs_file, device=device, name=reference_dir)
+  df["FID"] = fretchet_score
+  print(f"FID took {time.time() - fid_time} seconds")
+else:
+  fretchet_score = None
 
 # delete temporary files
 os.remove(reference_seqs_file)
+os.remove(full_reference_seqs_file)
 os.remove(target_seqs_file)
 
 if score_structure:
@@ -181,6 +198,9 @@ else :
 os.makedirs(os.path.dirname(os.path.realpath(save_path))) if not os.path.exists(os.path.dirname(os.path.realpath(save_path))) else None
 
 df.to_csv(save_path)
+
+print("===========================================")
 print(f"Results saved to {save_path}")
+print(f"Time taken: {time.time() - start_time} seconds")
 print("===========================================")
 

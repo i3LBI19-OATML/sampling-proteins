@@ -15,6 +15,7 @@ from scipy.spatial.distance import pdist
 import os
 from EVmutation.model import CouplingsModel
 from Bio.SeqIO.FastaIO import SimpleFastaParser
+from Bio.Emboss.Applications import NeedleCommandline
 
 
 # ESM-MSA
@@ -91,21 +92,24 @@ def substitution_score(target_seqs_file, reference_seqs_file, substitution_matri
       n_aligned = 0
       mutant_score = 0
       worst_score = 0
-      ell = sum([s != '-' for s in query_seqs[qn]]) # just the length of the query sequence.
+      # ell = sum([s != '-' for s in query_seqs[qn]]) # just the length of the query sequence.
+      ell = len(query_seqs[qn]) - query_seqs[qn].count('-')
       tn=""
       identity = 0
     else:
       # write a temporary fasta file
       with tempfile.TemporaryDirectory() as output_dir:
-
+        pairwise_result_file = output_dir + '/pairwise_result.fasta'
         pairwise_target_fasta = output_dir + '/a_sequence.fasta'
         pairwise_query_fasta = output_dir + '/b_sequence.fasta'
-        pairwise_result_file = output_dir + '/pairwise_result.fasta'
-        with open(pairwise_target_fasta,'w') as f:
-          f.write('>' + tn + '\n' + train_seqs[tn] + '\n')
-        with open(pairwise_query_fasta,'w') as f:
-          f.write('>' + qn + '\n' + query_seqs[qn] + '\n')
-        subprocess.run(["needle", "-gapopen", str(gap_open), "-gapextend", str(gap_extend), "-datafile", substitution_matrix_file, pairwise_target_fasta, pairwise_query_fasta, '-aformat', 'fasta', '-outfile', pairwise_result_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        with open(pairwise_target_fasta,'w') as f_target, open(pairwise_query_fasta,'w') as f_query:
+          f_target.write('>' + tn + '\n' + train_seqs[tn] + '\n')
+          f_query.write('>' + qn + '\n' + query_seqs[qn] + '\n')
+        # with open(pairwise_query_fasta,'w') as f:
+        #   f.write('>' + qn + '\n' + query_seqs[qn] + '\n')
+        needle_cline = NeedleCommandline(asequence=pairwise_target_fasta, bsequence=pairwise_query_fasta, gapopen=str(gap_open), gapextend=str(gap_extend), datafile=substitution_matrix_file, aformat='fasta', outfile=pairwise_result_file)
+        stdout, stderr = needle_cline()
+        # subprocess.run(["needle", "-gapopen", str(gap_open), "-gapextend", str(gap_extend), "-datafile", substitution_matrix_file, pairwise_target_fasta, pairwise_query_fasta, '-aformat', 'fasta', '-outfile', pairwise_result_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         # score it
         seqs = parse_fasta(pairwise_result_file)
         global_score = 0
@@ -130,7 +134,8 @@ def substitution_score(target_seqs_file, reference_seqs_file, substitution_matri
                 worst_score = score
         if n_mutants > 0:
           mutant_score /= n_mutants
-        ell = sum([s != '-' for s in seqs[1]]) # ell is the number of non-gaps in the query sequence.
+        ell = len(seqs[1]) - seqs[1].count('-')
+        # ell = sum([s != '-' for s in seqs[1]]) # ell is the number of non-gaps in the query sequence.
         if n_aligned == 0: #TODO: same here, are these defaults sensible?
           mutant_score = 0
           worst_score = 0

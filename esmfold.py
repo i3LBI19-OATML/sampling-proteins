@@ -61,6 +61,7 @@ else:
 
 target_dir = args.target_dir
 fasta_dir = glob(target_dir+"/*.fasta")
+assert len(fasta_dir) > 0, f"No fasta files found in {target_dir}"
 for fasta_path in fasta_dir:
   batch = fasta_path.split('/')[-3]
   sampling = fasta_path.split('/')[-2]

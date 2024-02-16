@@ -43,9 +43,10 @@ def CARP_640m_logp(target_seqs_file, results, device):
     del df
 
 # ESM1v (unmasked)
-def ESM_1v(target_files, results, device): #TODO: allow other devices?
+def ESM_1v(target_files, results, device, return_pred=False): #TODO: allow other devices?
   if device=='cuda:0':
     torch.cuda.empty_cache()
+  pred_arr = []
   for targets_fasta in target_files:
     with tempfile.TemporaryDirectory() as output_dir:
       outfile = output_dir + "/esm_results.tsv"
@@ -55,7 +56,12 @@ def ESM_1v(target_files, results, device): #TODO: allow other devices?
       df = pd.read_table(outfile)
       for i, row in df.iterrows():
         add_metric(results, row["id"], "ESM-1v", row["score"])
+        if return_pred:
+          p = row['score']
+          pred_arr.append(p)
       del df
+  if return_pred:
+    return pred_arr
 
 # ESM1v mask 6
 def ESM_1v_mask6(target_files, results, device): #TODO: allow other devices?

@@ -156,17 +156,39 @@ def calculate_activation_statistics(files, device='cuda:0', num_workers=8):
     return mu, sigma
 
 
-def compute_statistics_of_path(path, device, num_workers=8):
-    m, s = calculate_activation_statistics(path, device, num_workers)
+def compute_statistics_of_path(path, device, num_workers=1):
+    if type(path) is list and len(path) > 0:
+        m = np.mean(path, axis=0)
+        s = np.cov(path, rowvar=False)
+    else:
+        m, s = calculate_activation_statistics(path, device, num_workers)
 
     return m, s
 
 
-def calculate_fid_given_paths(target_files, reference_files, device='cuda:0', num_workers=8):
+def calculate_fid_given_paths(target_files, reference_files, name, device='cuda:0', num_workers=8):
     """Calculates the FID of two paths"""
     # print(f'target_files:{target_files}, reference_files:{reference_files}')
-    m1, s1 = compute_statistics_of_path(target_files, device, num_workers)
-    m2, s2 = compute_statistics_of_path(reference_files, device, num_workers)
+    # Target statistics
+    if type(target_files) is list and len(target_files) > 0:
+        m1, s1 = compute_statistics_of_path(target_files, device, num_workers)
+    else:
+        m1, s1 = calculate_activation_statistics(target_files, device, num_workers)
+    # Reference statistics
+    reference_name = pathlib.Path(name).stem
+    cache_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"tmp/reference_cache/{reference_name}.npy")
+    if os.path.exists(cache_file):
+        print(f"Loading reference statistics from {cache_file}")
+        m2, s2 = np.load(cache_file, allow_pickle=True)
+    else:
+        print(f"Calculating reference statistics for {reference_name} (Source: {reference_files})")
+        m2, s2 = compute_statistics_of_path(reference_files, device, num_workers)
+        
+        save_dir = os.path.dirname(cache_file)
+        os.makedirs(save_dir, exist_ok=True)
+        np.save(cache_file, (m2, s2))
+        print(f"Saved reference statistics to {cache_file}")
+    # Calculate FID
     fid_value = calculate_frechet_distance(m1, s1, m2, s2) * 1000
 
     # result = {"fid": fid_value}
