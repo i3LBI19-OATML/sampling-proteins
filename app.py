@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import transformers
 from transformers import PreTrainedTokenizerFast
 import tranception
@@ -88,15 +89,21 @@ def extend_sequence_by_n(sequence, n: int, reference_vocab, output_sequence=True
 #     return variants[['mutant','mutated_sequence']]
 
 def trim_DMS(DMS_data:pd.DataFrame, sampled_mutants:pd.DataFrame, mutation_rounds:int):
-  for mutation in range(2):
-    if mutation == 0:
-      DMS_data[f'past_mutation'] = DMS_data["mutant"].map(lambda x: ":".join(x.split(":", mutation_rounds-1)[:mutation_rounds-1]))
-    else:
-      DMS_data[f'current_mutation'] = DMS_data["mutant"].map(lambda x: ":".join(x.split(":", mutation_rounds-1)[mutation_rounds-1:]))
-  trimmed_variants = DMS_data[DMS_data[f'past_mutation'].isin(sampled_mutants['mutant'])].reset_index(drop=True)
-  # print(f'Trimmed DMS: {len(trimmed_variants)}')
-  trimmed_variants = trimmed_variants.drop_duplicates(subset=['mutant']).reset_index(drop=True)
-  return trimmed_variants[['mutant','mutated_sequence']]
+  if mutation_rounds == 0:
+    # get sequences in DMS that contains a substring of the sampled mutants
+    trimmed_variants = DMS_data[DMS_data["mutated_sequence"].str.contains('|'.join(sampled_mutants['mutated_sequence']))].reset_index(drop=True)
+    trimmed_variants = trimmed_variants.drop_duplicates(subset=['mutated_sequence']).reset_index(drop=True)
+    return trimmed_variants[['mutated_sequence']]
+  else:
+    for mutation in range(2):
+      if mutation == 0:
+        DMS_data[f'past_mutation'] = DMS_data["mutant"].map(lambda x: ":".join(x.split(":", mutation_rounds-1)[:mutation_rounds-1]))
+      else:
+        DMS_data[f'current_mutation'] = DMS_data["mutant"].map(lambda x: ":".join(x.split(":", mutation_rounds-1)[mutation_rounds-1:]))
+    trimmed_variants = DMS_data[DMS_data[f'past_mutation'].isin(sampled_mutants['mutant'])].reset_index(drop=True)
+    # print(f'Trimmed DMS: {len(trimmed_variants)}')
+    trimmed_variants = trimmed_variants.drop_duplicates(subset=['mutant']).reset_index(drop=True)
+    return trimmed_variants[['mutant','mutated_sequence']]
 
 def create_scoring_matrix_visual(scores,sequence,image_index=0,mutation_range_start=None,mutation_range_end=None,AA_vocab=AA_vocab,annotate=True,fontsize=20):
   filtered_scores=scores.copy()
@@ -287,12 +294,13 @@ def score_multi_mutations(sequence:str, extra_mutants:pd.DataFrame, Tranception_
   #   elif model_type=="Large":
   #     model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Large")
   model = Tranception_model
+  # print(f'model: {model}')
+  model.config.tokenizer = tokenizer
   if torch.cuda.is_available():
     model.cuda()
     print("Inference will take place on GPU")
   else:
     print("Inference will take place on CPU")
-  model.config.tokenizer = tokenizer
   scores, past_key_values = model.score_mutants(DMS_data=extra_mutants, 
                                     target_seq=sequence, 
                                     scoring_mirror=scoring_mirror, 

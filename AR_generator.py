@@ -9,6 +9,8 @@ import util
 from AR_sampling import ARtop_k_sampling, ARtemperature_sampler, ARtop_p_sampling, ARtypical_sampling, ARmirostat_sampling, ARrandom_sampling, ARbeam_search
 import time
 import AR_MCTS
+from EVmutation.model import CouplingsModel
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--sequence', type=str, help='Sequence to do mutation or DE')
@@ -24,6 +26,9 @@ parser.add_argument('--save_scores', action='store_true', help='Whether to save 
 parser.add_argument('--sampling_method', type=str, choices=['top_k', 'top_p', 'typical', 'mirostat', 'random', 'greedy', 'beam_search', 'mcts'], required=True, help='Sampling method')
 parser.add_argument('--sampling_threshold', type=float, help='Sampling threshold (k for top_k, p for top_p, tau for mirostat, beam_width in beam_search, etc.)')
 parser.add_argument('--temperature', type=float, default=1.0, help='Temperature for final sampling; 1.0 equals to random sampling')
+parser.add_argument('--filter', type=str, choices=['hpf'], help='Filter to use for MCTS/Beam Search')
+parser.add_argument('--intermediate_threshold', type=int, default=96, help='Intermediate threshold for MCTS/Beam Search')
+parser.add_argument('--evmutation_model_dir', type=str, help='Path to EVmutation model directory')
 parser.add_argument('--sequence_num', type=int, required=True, help='Number of sequences to generate')
 parser.add_argument('--seq_length', type=int, required=True, help='Length of each sequence to generate')
 parser.add_argument('--max_length', type=int, help='Number of search levels in beam search or MCTS')
@@ -45,6 +50,7 @@ model_type = args.model.capitalize() if args.model else None
 # Load model
 try:
     model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path=args.Tmodel, local_files_only=True)
+    # print(f'model A: {model}')
     print("Model successfully loaded from local")
 except:
     print("Model not found locally, downloading from HuggingFace")
@@ -54,6 +60,9 @@ except:
         model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Medium")
     elif model_type=="Large":
         model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Large")
+
+if args.sampling_method == 'beam_search' or args.sampling_method == 'mcts':
+    assert args.max_length is not None, "Maximum length must be specified for beam_search or MCTS sampling method"
 
 sequence_num = args.sequence_num
 seq_length = args.seq_length
@@ -93,7 +102,7 @@ while len(generated_sequence) < sequence_num:
         if args.sampling_method == 'mcts':
             sampling_strat = args.sampling_method
             sampling_threshold = args.max_length
-            mutation, past_key_values = AR_MCTS.UCT_search(seq, max_length=args.max_length, tokenizer=tokenizer, AA_vocab=AA_vocab, extension_factor=AA_extension, Tmodel=model, past_key_values=past_key_values)
+            mutation, past_key_values = AR_MCTS.UCT_search(seq, max_length=args.max_length, tokenizer=tokenizer, AA_vocab=AA_vocab, extension_factor=AA_extension, Tmodel=model, past_key_values=past_key_values, filter=args.filter, intermediate_sampling_threshold=args.intermediate_threshold, batch=args.batch)
             # print("MCTS mutation: ", mutation)
         
         else:
@@ -131,7 +140,8 @@ while len(generated_sequence) < sequence_num:
                 mutation = ARtop_k_sampling(scores, k=int(sampling_threshold), sampler=final_sampler)
             elif sampling_strat == 'beam_search':
                 assert args.max_length < seq_length, "Maximum length must be less than the length of the final sequence"
-                mutation, past_key_values = ARbeam_search(scores, beam_width=int(sampling_threshold), max_length=args.max_length, tokenizer=tokenizer, sampler=final_sampler, Tmodel=model, past_key_values=past_key_values, extension_factor=AA_extension)
+                # print(f'IST ar_gen 146: {args.intermediate_threshold}')
+                mutation, past_key_values = ARbeam_search(scores, beam_width=int(sampling_threshold), max_length=args.max_length, tokenizer=tokenizer, sampler=final_sampler, Tmodel=model, batch=args.batch, past_key_values=past_key_values, extension_factor=AA_extension, filter=args.filter, IST=args.intermediate_threshold)
             elif sampling_strat == 'top_p':
                 assert float(sampling_threshold) <= 1.0 and float(sampling_threshold) > 0, "Top-p sampling threshold must be between 0 and 1"
                 mutation = ARtop_p_sampling(scores, p=float(sampling_threshold), sampler=final_sampler)

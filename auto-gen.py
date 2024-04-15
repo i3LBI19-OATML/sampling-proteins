@@ -93,7 +93,9 @@ print('===============================================')
 overall_start_time = time.time()
 
 # Generate
-for idx in range(args.num_samples):
+
+while len(results) < args.num_samples:
+    idx = len(results)+1
     start_time = time.time()
     if args.sampling_method == 'mirostat':
         target_surprise = sampling_args[args.sampling_method]['target']
@@ -168,13 +170,16 @@ for idx in range(args.num_samples):
             cleaned_seq = [id for id in decoded[0] if id in AA_vocab]
             seq = ''.join(cleaned_seq).replace(' ', '').replace("\n", "")[:args.seq_len]
 
-    assert len(seq) == args.seq_len, f'Sequence length {len(seq)} does not match {args.seq_len}'
     seq_time_taken = round(time.time() - start_time, 3)
-    print(f'Output {idx+1}_{len(seq)} {seq_time_taken}s: {seq}') # Print sequence
-    # Save results
-    samp_thres = None if threshold == 0 else threshold
-    name = f'{args.model_type}_{idx+1}_{len(seq)}'
-    results.append({'name': name, 'sequence': seq, 'time': seq_time_taken, 'sampling': args.sampling_method, 'threshold': samp_thres})
+    if len(seq) == args.seq_len:
+        print(f'Output {idx+1}_{len(seq)} {seq_time_taken}s: {seq}') # Print sequence
+        # Save results
+        samp_thres = None if threshold == 0 else threshold
+        name = f'{args.model_type}_{idx+1}_{len(seq)}'
+        results.append({'name': name, 'sequence': seq, 'time': seq_time_taken, 'sampling': args.sampling_method, 'threshold': samp_thres})
+    else:
+        print(f'Sequence length {len(seq)} does not match {args.seq_len}')
+        continue
 
 
 generated_sequence_df = pd.DataFrame(results)

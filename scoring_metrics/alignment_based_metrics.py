@@ -146,9 +146,13 @@ def substitution_score(target_seqs_file, reference_seqs_file, substitution_matri
     add_metric(results, qn, f"Closest training sequence ({substitution_matrix})", tn)
     if Substitution_matrix_score_mean_of_mutated_positions:
       add_metric(results, qn, substitution_matrix, mutant_score)
-    if Identity_to_closest_reference:      
-      add_metric(results, qn, "Identity", identity)
-      add_metric(results, qn, "SD", dist)
+    if Identity_to_closest_reference: 
+      try:   
+        add_metric(results, qn, "Identity", identity)
+        add_metric(results, qn, "SD", dist)
+      except UnboundLocalError:
+        add_metric(results, qn, "Identity", None)
+        add_metric(results, qn, "SD", None)
 
 def EVmutation(target_files, orig_seq, results, model_params):
   # Load Model

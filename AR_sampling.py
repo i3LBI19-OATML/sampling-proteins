@@ -168,17 +168,25 @@ def ARrandom_sampling(scores: pd.DataFrame, sampler = ARtemperature_sampler(temp
   else:
     return scores['mutated_sequence'][sampled_score]
 
-def ARbeam_search(scores: pd.DataFrame, beam_width: int, max_length:int, tokenizer, Tmodel, score_mirror=False, batch=20, max_pos=50, sampler=ARtemperature_sampler(temperature=1.0), multi=False, past_key_values=None, extension_factor=1):
+def ARbeam_search(scores: pd.DataFrame, beam_width: int, max_length:int, tokenizer, Tmodel, score_mirror=False, batch=20, max_pos=50, sampler=ARtemperature_sampler(temperature=1.0), multi=False, past_key_values=None, extension_factor=1, filter='hpf', IST=96):
   length = 1
   while length < max_length:
     # Get top k mutations
+    beam_width = min(beam_width, len(scores))
     assert beam_width <= len(scores), "Beam width must be less than or equal to the number of mutations ({}).".format(len(scores))
     scores = ARtop_k_sampling(scores, k=beam_width, sampler=sampler, multi=True)
     # Extend each mutation by one
-    levels = pd.DataFrame(columns=['mutated_sequence'])
+    levels = pd.DataFrame(columns=['mutated_sequence']) # Initialize DataFrame
     for i, row in scores.iterrows():
       extension = app.extend_sequence_by_n(row['mutated_sequence'], extension_factor, AA_vocab, output_sequence=True)
       levels = pd.concat([levels, extension], ignore_index=True)
+    
+    # assert filter in ['hpf', 'qff'], "Filter must be one of 'hpf' or 'qff'"
+    if filter == 'hpf':
+      print("Filtering MCTS with HPF")
+      trimmed = app.trim_DMS(DMS_data=levels, sampled_mutants=scores, mutation_rounds=0)
+      levels = trimmed.sample(n=IST)
+
     # Score each mutation
     scores, _, past_key_values = app.score_multi_mutations(sequence=None, extra_mutants=levels, scoring_mirror=score_mirror, batch_size_inference=batch, max_number_positions_per_heatmap=max_pos, num_workers=8, AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=True, Tranception_model=Tmodel, past_key_values=past_key_values)
     length += 1
