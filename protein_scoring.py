@@ -110,6 +110,7 @@ score_mean = args.remove_sub_score_mean
 identity = args.remove_identity
 sub_gap_open = args.sub_gap_open
 sub_gap_extend = args.sub_gap_extend
+mask_distance = round(len(args.orig_seq)/len(args.orig_seq)*0.15) # mask distance is 15% of the length of the original sequence
 
 rand_id = randint(10000, 99999) # Necessary for parallelization
 # print("===========================================")
@@ -144,7 +145,7 @@ with open(target_seqs_file,"w") as fh:
       print(f">{name}\n{seq}", file=fh)
 
 alignment_time = time.time()
-ab_metrics.ESM_MSA(target_seqs_file, reference_seqs_file, results)
+ab_metrics.ESM_MSA(target_seqs_file, reference_seqs_file, results, mask_distance=mask_distance)
 ab_metrics.substitution_score(target_seqs_file, reference_seqs_file,
                               substitution_matrix=sub_matrix, 
                               Substitution_matrix_score_mean_of_mutated_positions=score_mean, 
