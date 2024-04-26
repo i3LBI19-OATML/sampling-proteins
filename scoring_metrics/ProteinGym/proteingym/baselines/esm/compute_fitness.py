@@ -95,6 +95,7 @@ def create_parser():
     parser.add_argument(
         "--model-location",
         type=str,
+        default="~/esm_msa1b_t12_100M_UR50S.pt",
         help="PyTorch model file OR name of pretrained model to download (see README for models)",
         nargs="+",
     )

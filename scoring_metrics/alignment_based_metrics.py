@@ -25,6 +25,11 @@ def ESM_MSA(target_seqs_file, reference_seqs_file, results, mask_distance):
     outfile = output_dir + "/esm_results.tsv"
     try:
       proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm_msa.py"), "-i", target_seqs_file, "-o", outfile, "--reference_msa", reference_seqs_file, "--subset_strategy", "top_hits", "--alignment_size", "384", "--count_gaps", "--mask_distance", "6", "--device", "gpu"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) # stdout=subprocess.PIPE, stderr=subprocess.PIPE
+
+      # ProteinGym Version
+      # TODO: Add arguments for ProteinGym --> Convert fasta to df, get mutation column, get msa path, get msa weights folder, get dms input, get dms index, get dms mapping
+      # proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", "", "--dms-input", "", "--dms_index", "", "--dms_mapping", "", "--mutation-col", "", "--msa-path", "", "--msa-weights-folder", "", "--filter-msa", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
     except subprocess.CalledProcessError as e:
       print(e.stderr.decode('utf-8'))
       print(e.stdout.decode('utf-8'))
