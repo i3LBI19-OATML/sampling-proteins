@@ -32,9 +32,10 @@ os.makedirs(default_target_dir) if not os.path.exists(default_target_dir) else N
 # Parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("--pdb_dir", type=str, default=default_pdb_dir, help="Directory containing pdb files")
-parser.add_argument("--reference_dir", type=str, default=default_reference_dir, help="Directory containing reference fasta files")
+parser.add_argument("--reference_dir", type=str, required=True, help="Directory containing reference fasta files")
+parser.add_argument("--msa_weights_dir", type=str, required=True, help="Directory containing MSA weights files (Obtain from ProteinGym repo)")
 parser.add_argument("--ref_pdb_dir", type=str, default=default_reference_pdb_dir, help="Directory containing reference pdb files")
-parser.add_argument("--target_dir", type=str, default=default_target_dir, help="Directory containing target fasta files")
+parser.add_argument("--target_dir", type=str, required=True, help="Directory containing target fasta files")
 parser.add_argument("--sub_matrix", type=str, choices=["blosum62", "pfasum15"], default="blosum62", help="Substitution matrix to use for alignment-based metrics")
 parser.add_argument("--remove_sub_score_mean", action="store_false", help="Whether to not score the mean of the scores for mutated sequences")
 parser.add_argument("--remove_identity", action="store_false", help="Whether to not score the identity of the mutated sequence to the closest reference sequence")
@@ -49,7 +50,7 @@ parser.add_argument("--use_tranception", action="store_true", help="Whether to u
 parser.add_argument("--use_evmutation", action="store_true", help="Whether to use EVmutation")
 parser.add_argument("--skip_FID", action="store_true", help="Whether to not calculate FID")
 parser.add_argument("--model_params", type=str, help="Model params to use for EVmutation")
-parser.add_argument("--orig_seq", type=str, help="Original sequence to use for Tranception or EVmutation")
+parser.add_argument("--orig_seq", required=True, type=str, help="Original sequence to use for Tranception or EVmutation")
 parser.add_argument('--output_name', type=str, required=True, help='Output file name (Just name with no extension!)')
 args = parser.parse_args()
 
@@ -68,12 +69,14 @@ if score_structure:
   ref_pdb_dir = os.path.abspath(args.ref_pdb_dir)
 reference_dir = os.path.abspath(args.reference_dir)
 target_dir = os.path.abspath(args.target_dir)
+msa_weights_dir = os.path.abspath(args.msa_weights_dir)
 
 if score_structure:
   assert os.path.exists(pdb_dir), f"PDB directory {pdb_dir} does not exist"
   assert os.path.exists(ref_pdb_dir), f"Reference PDB directory {ref_pdb_dir} does not exist"
 assert os.path.exists(reference_dir), f"Reference directory {reference_dir} does not exist"
 assert os.path.exists(target_dir), f"Target directory {target_dir} does not exist"
+assert os.path.exists(msa_weights_dir), f"MSA weights directory {msa_weights_dir} does not exist"
 
 # Check that the required files exist
 if score_structure:
@@ -81,12 +84,14 @@ if score_structure:
   reference_pdb_files = glob(ref_pdb_dir + "/*.pdb")
 reference_files = glob(reference_dir + "/*.fasta")
 target_files = glob(target_dir + "/*.fasta")
+msa_weights_files = glob(msa_weights_dir + "/*.npy")[0]
 
 if score_structure:
   assert len(pdb_files) > 0, f"No pdb files found in {pdb_dir}"
   assert len(reference_pdb_files) > 0, f"No reference pdb files found in {ref_pdb_dir}"
 assert len(reference_files) > 0, f"No reference fasta files found in {reference_dir}"
 assert len(target_files) > 0, f"No target fasta files found in {target_dir}"
+assert len(msa_weights_files) > 0, f"No MSA weights files found in {msa_weights_dir}"
 
 if score_structure:
 # Structure metrics
@@ -145,7 +150,7 @@ with open(target_seqs_file,"w") as fh:
       print(f">{name}\n{seq}", file=fh)
 
 alignment_time = time.time()
-ab_metrics.ESM_MSA(target_seqs_file, reference_seqs_file, results, mask_distance=mask_distance)
+ab_metrics.ESM_MSA(target_seqs_file, reference_seqs_file, results, orig_seq=args.orig_seq.upper(), msa_weights=msa_weights_files)
 ab_metrics.substitution_score(target_seqs_file, reference_seqs_file,
                               substitution_matrix=sub_matrix, 
                               Substitution_matrix_score_mean_of_mutated_positions=score_mean, 

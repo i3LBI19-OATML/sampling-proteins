@@ -29,22 +29,6 @@ tokenizer = PreTrainedTokenizerFast(tokenizer_file=os.path.join(os.path.dirname(
                                                 mask_token="[MASK]"
                                             )
 
-# def create_all_single_mutants(sequence,AA_vocab=AA_vocab,mutation_range_start=None,mutation_range_end=None):
-#   all_single_mutants= {}
-#   sequence_list=list(sequence)
-#   if mutation_range_start is None: mutation_range_start=1
-#   if mutation_range_end is None: mutation_range_end=len(sequence)
-#   for position,current_AA in enumerate(sequence[mutation_range_start-1:mutation_range_end]):
-#     for mutated_AA in AA_vocab:
-#       if current_AA!=mutated_AA:
-#         mutated_sequence = sequence_list.copy()
-#         mutated_sequence[position] = mutated_AA
-#         all_single_mutants[current_AA+str(mutation_range_start+position)+mutated_AA]="".join(mutated_sequence)
-#   all_single_mutants = pd.DataFrame.from_dict(all_single_mutants,columns=['mutated_sequence'],orient='index')
-#   all_single_mutants.reset_index(inplace=True)
-#   all_single_mutants.columns = ['mutant','mutated_sequence']
-#   return all_single_mutants
-
 def create_all_single_mutants(sequence, AA_vocab=AA_vocab, mutation_range_start=None, mutation_range_end=None):
     sequence_list = list(sequence)
     if mutation_range_start is None: mutation_range_start = 1
@@ -64,29 +48,6 @@ def extend_sequence_by_n(sequence, n: int, reference_vocab, output_sequence=True
   else:
     df_ext = pd.DataFrame.from_dict({"extension": permut})
     return df_ext
-
-# def generate_n_extra_mutations(DMS_data: pd.DataFrame, extra_mutations: int, AA_vocab=AA_vocab, mutation_range_start=None, mutation_range_end=None):
-#     variants = DMS_data
-#     seq = variants["mutated_sequence"][0]
-#     assert extra_mutations > 0, "Number of mutations must be greater than 0."
-#     if mutation_range_start is None: mutation_range_start=1
-#     if mutation_range_end is None: mutation_range_end=len(seq)
-#     count = 0
-#     while count < extra_mutations:
-#         print(f"Creating extra mutation {count+1}")
-#         new_variants = []
-#         for index, variant in tqdm.tqdm(variants.iterrows(), total=len(variants), desc=f"Creating extra mutation {count+1}"):
-#             for i in range(mutation_range_start-1, mutation_range_end):
-#                 for aa in AA_vocab:
-#                     if aa != variant["mutated_sequence"][i]:
-#                         new_variant = {
-#                             "mutated_sequence": variant["mutated_sequence"][:i] + aa + variant["mutated_sequence"][i+1:],
-#                             "mutant": variant["mutant"] + f":{variant['mutated_sequence'][i]}{i+1}{aa}"
-#                         }
-#                         new_variants.append(new_variant)
-#         count += 1
-#         variants = pd.DataFrame(new_variants)
-#     return variants[['mutant','mutated_sequence']]
 
 def trim_DMS(DMS_data:pd.DataFrame, sampled_mutants:pd.DataFrame, mutation_rounds:int):
   if mutation_rounds == 0:
@@ -329,17 +290,17 @@ def clear_inputs(protein_sequence_input,mutation_range_start,mutation_range_end)
   mutation_range_end = None
   return protein_sequence_input,mutation_range_start,mutation_range_end, extra_mutants
 
-def predict_proteinBERT(model, DMS, input_encoder, top_n, batch_size):
-  seqs = DMS["mutated_sequence"]
-  seq_len = 512
+# def predict_proteinBERT(model, DMS, input_encoder, top_n, batch_size):
+#   seqs = DMS["mutated_sequence"]
+#   seq_len = 512
 
-  X = input_encoder.encode_X(seqs, seq_len)
-  y_pred = model.predict(X, batch_size = batch_size)
+#   X = input_encoder.encode_X(seqs, seq_len)
+#   y_pred = model.predict(X, batch_size = batch_size)
 
-  DMS['prediction'] = y_pred
-  DMS = DMS.sort_values(by = 'prediction', ascending = False, ignore_index = True)
-  # DMS = DMS.head(top_n)
-  return DMS.head(top_n)[['mutated_sequence', 'mutant']]
+#   DMS['prediction'] = y_pred
+#   DMS = DMS.sort_values(by = 'prediction', ascending = False, ignore_index = True)
+#   # DMS = DMS.head(top_n)
+#   return DMS.head(top_n)[['mutated_sequence', 'mutant']]
 
 def load_savedmodel(model_path):
   model = keras.models.load_model(model_path)
