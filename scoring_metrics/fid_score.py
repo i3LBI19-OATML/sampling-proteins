@@ -45,7 +45,7 @@ except ImportError:
     def tqdm(x):
         return x
 
-def get_ESM1v_predictions(target_files, device = 'cuda:0'):
+def get_ESM1v_predictions(target_files, orig_seq, device='cuda:0'):
     pred_arr = []
     if device=='cuda:0':
         torch.cuda.empty_cache()
@@ -53,9 +53,24 @@ def get_ESM1v_predictions(target_files, device = 'cuda:0'):
     for targets_fasta in [target_files]:
         # print(f'target_fasta:{targets_fasta}')
         with tempfile.TemporaryDirectory() as output_dir:
-            outfile = output_dir + "/esm_results.tsv"
+            outfile = output_dir + "/esm_results.csv"
             try:
-                proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm.py"), "-i", targets_fasta, "-o", outfile, "--model", "esm1v", "--masking_off", "--score_name", "score", "--device", "gpu", "--use_repr"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                # proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm.py"), "-i", targets_fasta, "-o", outfile, "--model", "esm1v", "--masking_off", "--score_name", "score", "--device", "gpu", "--use_repr"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+                # ProteinGym Version
+                seq_name, seq = parse_fasta(targets_fasta,return_names=True, clean="unalign")
+                # ref_name, ref = parse_fasta(reference_seqs_file,return_names=True, clean="unalign")
+
+                df_target = pd.DataFrame({"id":seq_name, "sequence":seq})
+                # identify mutations
+                df_target['mutant'] = df_target['sequence'].apply(lambda x: identify_mutation(orig_seq, x, sep=":"))
+
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    df_target.to_csv(os.path.join(temp_dir, "target.csv"), index=False)
+                    df_target = os.path.join(temp_dir, "target.csv")
+
+                    proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--dms-input", os.path.join(temp_dir, "target.csv"), "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", "/users/jerwan/esm1v_t33_650M_UR90S_1.pt", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                
                 # print(proc.stdout)
                 # print(proc.stderr)
             except subprocess.CalledProcessError as e:
@@ -65,7 +80,7 @@ def get_ESM1v_predictions(target_files, device = 'cuda:0'):
             df = pd.read_table(outfile)
             print("done")
             for i, row in df.iterrows():
-                p = row['score']
+                p = row['esm1v_t33_650M_UR90S_1_ensemble']
                 pred_arr.append(p)
     # print(pred_arr)
     return pred_arr
@@ -131,7 +146,7 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
             + np.trace(sigma2) - 2 * tr_covmean)
 
 
-def calculate_activation_statistics(files, device='cuda:0', num_workers=8):
+def calculate_activation_statistics(files, orig_seq, device='cuda:0', num_workers=8):
     """Calculation of the statistics used by the FID.
     Params:
     -- files       : List of image files paths
@@ -150,30 +165,30 @@ def calculate_activation_statistics(files, device='cuda:0', num_workers=8):
                the inception model.
     """
     # act = get_activations(files, model, batch_size, dims, device, num_workers)
-    act = get_ESM1v_predictions(files, device)
+    act = get_ESM1v_predictions(files, orig_seq, device)
     mu = np.mean(act, axis=0)
     sigma = np.cov(act, rowvar=False)
     return mu, sigma
 
 
-def compute_statistics_of_path(path, device, num_workers=1):
+def compute_statistics_of_path(path, orig_seq, device, num_workers=1):
     if type(path) is list and len(path) > 0:
         m = np.mean(path, axis=0)
         s = np.cov(path, rowvar=False)
     else:
-        m, s = calculate_activation_statistics(path, device, num_workers)
+        m, s = calculate_activation_statistics(path, orig_seq, device, num_workers)
 
     return m, s
 
 
-def calculate_fid_given_paths(target_files, reference_files, name, device='cuda:0', num_workers=8):
+def calculate_fid_given_paths(target_files, reference_files, name, orig_seq, device='cuda:0', num_workers=8):
     """Calculates the FID of two paths"""
     # print(f'target_files:{target_files}, reference_files:{reference_files}')
     # Target statistics
     if type(target_files) is list and len(target_files) > 0:
         m1, s1 = compute_statistics_of_path(target_files, device, num_workers)
     else:
-        m1, s1 = calculate_activation_statistics(target_files, device, num_workers)
+        m1, s1 = calculate_activation_statistics(target_files, orig_seq, device, num_workers)
     # Reference statistics
     reference_name = pathlib.Path(name).stem
     cache_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"tmp/reference_cache/{reference_name}.npy")
@@ -182,7 +197,7 @@ def calculate_fid_given_paths(target_files, reference_files, name, device='cuda:
         m2, s2 = np.load(cache_file, allow_pickle=True)
     else:
         print(f"Calculating reference statistics for {reference_name} (Source: {reference_files})")
-        m2, s2 = compute_statistics_of_path(reference_files, device, num_workers)
+        m2, s2 = compute_statistics_of_path(reference_files, orig_seq, device, num_workers)
         
         save_dir = os.path.dirname(cache_file)
         os.makedirs(save_dir, exist_ok=True)

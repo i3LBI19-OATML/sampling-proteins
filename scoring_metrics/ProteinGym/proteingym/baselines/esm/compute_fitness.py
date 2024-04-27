@@ -260,7 +260,7 @@ def compute_pppl(row, sequence, model, alphabet, offset_idx):
 
 
 def main(args):
-    if not os.path.exists(args.dms_output): os.mkdir(args.dms_output)
+    # if not os.path.exists(args.dms_output): os.mkdir(args.dms_output)
     print("Arguments:", args)
 
     # Load the deep mutational scan

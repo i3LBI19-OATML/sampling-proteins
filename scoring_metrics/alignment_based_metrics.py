@@ -21,6 +21,10 @@ from Bio.Emboss.Applications import NeedleCommandline
 # ESM-MSA
 def ESM_MSA(target_seqs_file, reference_seqs_file, results, orig_seq, msa_weights):
   print("Scoring with ESM-MSA")
+  # rand_id = np.random.randint(100000,100000)
+  # msa_result_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"tmp/esm_msa_cache/esm_msa_{rand_id}.csv")
+  # os.makedirs(os.path.dirname(os.path.realpath(msa_result_path))) if not os.path.exists(os.path.dirname(os.path.realpath(msa_result_path))) else None
+  
   with tempfile.TemporaryDirectory() as output_dir:
     outfile = os.path.join(output_dir, "esm_results.csv")
     try:
@@ -32,7 +36,7 @@ def ESM_MSA(target_seqs_file, reference_seqs_file, results, orig_seq, msa_weight
 
       df_target = pd.DataFrame({"id":seq_name, "sequence":seq})
       # identify mutations
-      df_target['mutant'] = df_target['sequence'].apply(lambda x: identify_mutation(orig_seq, x, sep=";"))
+      df_target['mutant'] = df_target['sequence'].apply(lambda x: identify_mutation(orig_seq, x, sep=":"))
 
       # create a temp file path for target csv and reference MSA
       with tempfile.TemporaryDirectory() as temp_dir:
@@ -46,13 +50,16 @@ def ESM_MSA(target_seqs_file, reference_seqs_file, results, orig_seq, msa_weight
       print(e.stderr.decode('utf-8'))
       print(e.stdout.decode('utf-8'))
       raise e
+
     # debug
-    print(proc.stdout)
-    print(proc.stderr)
+    # print(proc.stdout)
+    # print(proc.stderr)
+
     df = pd.read_csv(outfile)
-    print(f'P-Gym MSA results: {df}')
+    # print(f'ESM-MSA.columns: {df.columns}')
+    # print(f'P-Gym ESM-MSA results: {df.head()}')
     for i, row in df.iterrows():
-      add_metric(results, row["id"], "ESM-MSA", row["esm-msa"])
+      add_metric(results, row["id"], "ESM-MSA", row["esm_msa1b_t12_100M_UR50S_ensemble"])
     del df
 
 # substitution score

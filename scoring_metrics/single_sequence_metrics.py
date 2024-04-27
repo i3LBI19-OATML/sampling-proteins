@@ -43,23 +43,45 @@ def CARP_640m_logp(target_seqs_file, results, device):
     del df
 
 # ESM1v (unmasked)
-def ESM_1v(target_files, results, device, return_pred=False): #TODO: allow other devices?
+def ESM_1v(target_files, results, device, return_pred, orig_seq): #TODO: allow other devices?
   if device=='cuda:0':
     torch.cuda.empty_cache()
   pred_arr = []
-  for targets_fasta in target_files:
-    with tempfile.TemporaryDirectory() as output_dir:
-      outfile = output_dir + "/esm_results.tsv"
-      proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm.py"), "-i", targets_fasta, "-o", outfile, "--model", "esm1v", "--masking_off", "--score_name", "score", "--device", "gpu"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-      # print(proc.stdout)
-      # print(proc.stderr)
-      df = pd.read_table(outfile)
-      for i, row in df.iterrows():
-        add_metric(results, row["id"], "ESM-1v", row["score"])
-        if return_pred:
-          p = row['score']
-          pred_arr.append(p)
-      del df
+  with tempfile.TemporaryDirectory() as output_dir:
+    outfile = output_dir + "/esm_results.csv"
+    try:
+      # proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm.py"), "-i", targets_fasta, "-o", outfile, "--model", "esm1v", "--masking_off", "--score_name", "score", "--device", "gpu"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+      
+      # ProteinGym Version
+      seq_name, seq = parse_fasta(target_files,return_names=True, clean="unalign")
+      # ref_name, ref = parse_fasta(reference_seqs_file,return_names=True, clean="unalign")
+
+      df_target = pd.DataFrame({"id":seq_name, "sequence":seq})
+      # identify mutations
+      df_target['mutant'] = df_target['sequence'].apply(lambda x: identify_mutation(orig_seq, x, sep=":"))
+
+      with tempfile.TemporaryDirectory() as temp_dir:
+        df_target.to_csv(os.path.join(temp_dir, "target.csv"), index=False)
+        df_target = os.path.join(temp_dir, "target.csv")
+
+        proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--dms-input", os.path.join(temp_dir, "target.csv"), "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", "/users/jerwan/esm1v_t33_650M_UR90S_1.pt", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    
+    except subprocess.CalledProcessError as e:
+      print(e.stderr.decode('utf-8'))
+      print(e.stdout.decode('utf-8'))
+      raise e
+
+    # print(proc.stdout)
+    # print(proc.stderr)
+    df = pd.read_table(outfile)
+    print(f'ESM1v.columns: {df.columns}')
+    print(f'P-Gym ESM-1v results: {df.head()}')
+    for i, row in df.iterrows():
+      add_metric(results, row["id"], "ESM-1v", row["esm1v_t33_650M_UR90S_1_ensemble"])
+      if return_pred:
+        p = row['esm1v_t33_650M_UR90S_1_ensemble']
+        pred_arr.append(p)
+    del df
   if return_pred:
     return pred_arr
 

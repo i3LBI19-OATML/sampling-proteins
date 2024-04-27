@@ -23,5 +23,5 @@ dependencies:
   - importlib_metadata
   - safetensors
   - pip:
-      - -e ./protein_bert/
+      # - -e ./protein_bert/
       - pandas==2.0.2
