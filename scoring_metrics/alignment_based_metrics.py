@@ -22,7 +22,7 @@ from Bio.Emboss.Applications import NeedleCommandline
 def ESM_MSA(target_seqs_file, reference_seqs_file, results, orig_seq, msa_weights):
   print("Scoring with ESM-MSA")
   with tempfile.TemporaryDirectory() as output_dir:
-    outfile = output_dir + "/esm_results.csv"
+    outfile = os.path.join(output_dir, "esm_results.csv")
     try:
       # proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm_msa.py"), "-i", target_seqs_file, "-o", outfile, "--reference_msa", reference_seqs_file, "--subset_strategy", "top_hits", "--alignment_size", "384", "--count_gaps", "--mask_distance", "6", "--device", "gpu"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE) # stdout=subprocess.PIPE, stderr=subprocess.PIPE
 
@@ -32,26 +32,23 @@ def ESM_MSA(target_seqs_file, reference_seqs_file, results, orig_seq, msa_weight
 
       df_target = pd.DataFrame({"id":seq_name, "sequence":seq})
       # identify mutations
-      df_target['mutant'] = df_target['sequence'].apply(lambda x: identify_mutation(orig_seq, x))
+      df_target['mutant'] = df_target['sequence'].apply(lambda x: identify_mutation(orig_seq, x, sep=";"))
 
       # create a temp file path for target csv and reference MSA
       with tempfile.TemporaryDirectory() as temp_dir:
         df_target.to_csv(os.path.join(temp_dir, "target.csv"), index=False)
         df_target = os.path.join(temp_dir, "target.csv")
 
-        with open(os.path.join(temp_dir, "reference.fasta"), "w") as f:
-          for i, (name, seq) in enumerate(parse_fasta(reference_seqs_file, return_names=True)):
-            f.write(f">{name}\n{seq}\n")
-
         # TODO: Add arguments for ProteinGym --> Convert fasta to df, get mutation column, get msa path, get msa weights folder, get dms input
-        proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--dms-input", os.path.join(temp_dir, "target.csv"), "--dms_output", outfile, "--mutation-col", "mutant", "--msa-path", os.path.join(temp_dir, "reference.fasta"), "--msa-weights-folder", msa_weights, "--filter-msa", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--dms-input", os.path.join(temp_dir, "target.csv"), "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", "/users/jerwan/esm_msa1b_t12_100M_UR50S.pt", "--msa-path", reference_seqs_file, "--msa-weights-folder", msa_weights, "--filter-msa", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     except subprocess.CalledProcessError as e:
       print(e.stderr.decode('utf-8'))
       print(e.stdout.decode('utf-8'))
       raise e
-    # print(proc.stdout)
-    # print(proc.stderr)
+    # debug
+    print(proc.stdout)
+    print(proc.stderr)
     df = pd.read_csv(outfile)
     print(f'P-Gym MSA results: {df}')
     for i, row in df.iterrows():

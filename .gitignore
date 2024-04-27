@@ -4,7 +4,13 @@
 __pycache__
 src/pgen.egg-info/
 */tmp/*.fasta
-tmp/*.fasta
+
+*/tmp/random_unalign_ref_cache/
+*/tmp/raw_ref_cache/
+*/tmp/reference_cache/
+*/tmp/target_cache/
+*/tmp/unalign_ref_cache/
+
 condaenv.*.txt
 */tmp/*.txt
 *.csv

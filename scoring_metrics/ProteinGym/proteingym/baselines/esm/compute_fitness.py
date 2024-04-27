@@ -28,6 +28,7 @@ def read_msa(filename: str, nseq: int, sampling_strategy: str, random_seed: int,
     print("Sampling sequences from MSA with strategy: "+str(sampling_strategy))
     random.seed(random_seed)
     if filter_msa:
+        filename = str(filename) if not isinstance(filename, str) else filename # In case it is a pathlib object
         input_folder = '/'.join(filename.split('/')[:-1])
         msa_name = filename.split('/')[-1].split('.')[0]
         if not os.path.isdir(input_folder+os.sep+'preprocessed'):
@@ -95,7 +96,6 @@ def create_parser():
     parser.add_argument(
         "--model-location",
         type=str,
-        default="~/esm_msa1b_t12_100M_UR50S.pt",
         help="PyTorch model file OR name of pretrained model to download (see README for models)",
         nargs="+",
     )
@@ -282,7 +282,8 @@ def main(args):
 
         mutant_col = row["DMS_mutant_column"] if "DMS_mutant_column" in mapping_protein_seq_DMS.columns else "mutant"
         DMS_phenotype_name = row["DMS_phenotype_name"] if "DMS_phenotype_name" in mapping_protein_seq_DMS else "DMS_score"
-        args.dms_output=str(args.dms_output)+os.sep+DMS_id+'.csv'
+        
+        args.dms_output=str(args.dms_output)+os.sep+DMS_id+'.csv' if not args.dms_output.endswith('.csv') else args.dms_output+os.sep+DMS_id+'.csv'
         
         target_seq_start_index = row["start_idx"] if "start_idx" in mapping_protein_seq_DMS.columns and row["start_idx"]!="" else 1
         target_seq_end_index = target_seq_start_index + len(args.sequence) 
@@ -309,6 +310,8 @@ def main(args):
         print(f"DMS index is None, using args.dms_input as a filename directly: {args.dms_input}")
         target_seq_start_index = args.offset_idx
         df = pd.read_csv(args.dms_input)
+        msa_start_index =args.offset_idx
+        MSA_weight_file_name = args.msa_weights_folder
     
     if len(df) == 0:
         raise ValueError("No rows found in the dataframe")
@@ -330,15 +333,16 @@ def main(args):
 
         if isinstance(model, MSATransformer):
             args.offset_idx = msa_start_index
+            args.seeds = [args.seeds] if isinstance(args.seeds, int) else args.seeds
             for seed in args.seeds:
-                if os.path.exists(args.dms_output):
-                    prior_score_df = pd.read_csv(args.dms_output)
-                    if f"{model_location}_seed{seed}" in prior_score_df.columns and not args.overwrite_prior_scores:
-                        print(f"Skipping seed {seed} as it is already in the dataframe")
-                        df = prior_score_df
-                        continue
-                else:
-                    prior_score_df = None 
+                # if os.path.exists(args.dms_output):
+                #     prior_score_df = pd.read_csv(args.dms_output)
+                #     if f"{model_location}_seed{seed}" in prior_score_df.columns and not args.overwrite_prior_scores:
+                #         print(f"Skipping seed {seed} as it is already in the dataframe")
+                #         df = prior_score_df
+                #         continue
+                # else:
+                #     prior_score_df = None 
                 data = [read_msa(filename=args.msa_path, nseq=args.msa_samples, sampling_strategy=args.msa_sampling_strategy, random_seed=seed, weight_filename=MSA_weight_file_name,
                                 filter_msa=args.filter_msa, hhfilter_min_cov=args.hhfilter_min_cov, hhfilter_max_seq_id=args.hhfilter_max_seq_id, hhfilter_min_seq_id=args.hhfilter_min_seq_id, path_to_hhfilter=args.path_to_hhfilter)]
                 assert (

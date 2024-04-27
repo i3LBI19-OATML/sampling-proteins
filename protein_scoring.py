@@ -121,17 +121,32 @@ rand_id = randint(10000, 99999) # Necessary for parallelization
 # print("===========================================")
 print(f"Using random ID {rand_id} for temporary files")
 
-#concatenate reference sequences
-# Reference sequences
-reference_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/reference_seqs_{rand_id}.fasta")
-full_reference_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/full_reference_seqs_{rand_id}.fasta")
+# Temporary files
+reference_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/random_unalign_ref_cache/reference_seqs_{rand_id}.fasta")
+full_reference_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/unalign_ref_cache/full_reference_seqs_{rand_id}.fasta")
+raw_reference_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/raw_ref_cache/raw_reference_seqs_{rand_id}.fasta")
+target_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/target_cache/target_seqs_{rand_id}.fasta")
 
+# create dir
+os.makedirs(os.path.dirname(os.path.realpath(reference_seqs_file))) if not os.path.exists(os.path.dirname(os.path.realpath(reference_seqs_file))) else None
+os.makedirs(os.path.dirname(os.path.realpath(full_reference_seqs_file))) if not os.path.exists(os.path.dirname(os.path.realpath(full_reference_seqs_file))) else None
+os.makedirs(os.path.dirname(os.path.realpath(raw_reference_seqs_file))) if not os.path.exists(os.path.dirname(os.path.realpath(raw_reference_seqs_file))) else None
+os.makedirs(os.path.dirname(os.path.realpath(target_seqs_file))) if not os.path.exists(os.path.dirname(os.path.realpath(target_seqs_file))) else None
+
+# Reference sequences
+# concatenate reference sequences
 n = 400  # default value for quick analysis; replace with the number of sequences you want
 sequences = []
 
 with open(full_reference_seqs_file,"w") as fh:
   for reference_fasta in reference_files:
     for name, seq in zip(*parse_fasta(reference_fasta, return_names=True, clean="unalign")):
+      print(f">{name}\n{seq}", file=fh)
+      sequences.append((name, seq))
+
+with open(raw_reference_seqs_file,"w") as fh:
+  for reference_fasta in reference_files:
+    for name, seq in zip(*parse_fasta(reference_fasta, return_names=True, clean=None, full_name=True)):
       print(f">{name}\n{seq}", file=fh)
       sequences.append((name, seq))
 
@@ -143,14 +158,13 @@ with open(reference_seqs_file,"w") as fh:
         print(f">{name}\n{seq}", file=fh)
 
 # Target sequences
-target_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/target_seqs_{rand_id}.fasta")
 with open(target_seqs_file,"w") as fh:
   for target_fasta in target_files:
     for name, seq in zip(*parse_fasta(target_fasta, return_names=True, clean="unalign")):
       print(f">{name}\n{seq}", file=fh)
 
 alignment_time = time.time()
-ab_metrics.ESM_MSA(target_seqs_file, reference_seqs_file, results, orig_seq=args.orig_seq.upper(), msa_weights=msa_weights_files)
+ab_metrics.ESM_MSA(target_seqs_file, raw_reference_seqs_file, results, orig_seq=args.orig_seq.upper(), msa_weights=msa_weights_files)
 ab_metrics.substitution_score(target_seqs_file, reference_seqs_file,
                               substitution_matrix=sub_matrix, 
                               Substitution_matrix_score_mean_of_mutated_positions=score_mean, 
