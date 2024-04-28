@@ -219,14 +219,17 @@ def create_parser():
 
 def label_row(row, sequence, token_probs, alphabet, offset_idx):
     score=0
-    for mutation in row.split(":"):
-        wt, idx, mt = mutation[0], int(mutation[1:-1]) - offset_idx, mutation[-1]
-        assert sequence[idx] == wt, "The listed wildtype does not match the provided sequence"
+    try:
+        for mutation in row.split(":"):
+            wt, idx, mt = mutation[0], int(mutation[1:-1]) - offset_idx, mutation[-1]
+            assert sequence[idx] == wt, "The listed wildtype does not match the provided sequence"
 
-        wt_encoded, mt_encoded = alphabet.get_idx(wt), alphabet.get_idx(mt)
+            wt_encoded, mt_encoded = alphabet.get_idx(wt), alphabet.get_idx(mt)
 
-        # add 1 for BOS
-        score += (token_probs[0, 1 + idx, mt_encoded] - token_probs[0, 1 + idx, wt_encoded]).item()
+            # add 1 for BOS
+            score += (token_probs[0, 1 + idx, mt_encoded] - token_probs[0, 1 + idx, wt_encoded]).item()
+    except:
+        print(f"Error in row: {row} type: {type(row)}")
     return score
 
 

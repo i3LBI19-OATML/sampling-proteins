@@ -9,7 +9,7 @@
 # repeat_3 = True
 # repeat_4 = True
 
-from .util import add_metric
+from .util import add_metric, identify_mutation
 import tempfile
 import subprocess
 import pandas as pd
@@ -58,13 +58,17 @@ def ESM_1v(target_files, results, device, return_pred, orig_seq): #TODO: allow o
 
       df_target = pd.DataFrame({"id":seq_name, "sequence":seq})
       # identify mutations
+      df_target = df_target[df_target['sequence'].apply(lambda x: len(x) == len(orig_seq))]
       df_target['mutant'] = df_target['sequence'].apply(lambda x: identify_mutation(orig_seq, x, sep=":"))
+      # remove nan
+      df_target = df_target.dropna(subset=['mutant'])
 
       with tempfile.TemporaryDirectory() as temp_dir:
         df_target.to_csv(os.path.join(temp_dir, "target.csv"), index=False)
         df_target = os.path.join(temp_dir, "target.csv")
 
-        proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--dms-input", os.path.join(temp_dir, "target.csv"), "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", "/users/jerwan/esm1v_t33_650M_UR90S_1.pt", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # print(f'ESM1v:')
+        proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--model_type", "ESM1v", "--dms-input", os.path.join(temp_dir, "target.csv"), "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", "/users/jerwan/esm1v_t33_650M_UR90S_1.pt", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
     except subprocess.CalledProcessError as e:
       print(e.stderr.decode('utf-8'))
@@ -73,13 +77,13 @@ def ESM_1v(target_files, results, device, return_pred, orig_seq): #TODO: allow o
 
     # print(proc.stdout)
     # print(proc.stderr)
-    df = pd.read_table(outfile)
-    print(f'ESM1v.columns: {df.columns}')
-    print(f'P-Gym ESM-1v results: {df.head()}')
+    df = pd.read_csv(outfile)
+    # print(f'ESM1v.columns: {df.columns}')
+    # print(f'P-Gym ESM-1v results: {df[["id", "Ensemble_ESM1v"]].head()}')
     for i, row in df.iterrows():
-      add_metric(results, row["id"], "ESM-1v", row["esm1v_t33_650M_UR90S_1_ensemble"])
+      add_metric(results, row["id"], "ESM-1v", row["Ensemble_ESM1v"])
       if return_pred:
-        p = row['esm1v_t33_650M_UR90S_1_ensemble']
+        p = row['Ensemble_ESM1v']
         pred_arr.append(p)
     del df
   if return_pred:

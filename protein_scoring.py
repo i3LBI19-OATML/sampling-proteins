@@ -138,17 +138,16 @@ os.makedirs(os.path.dirname(os.path.realpath(target_seqs_file))) if not os.path.
 n = 400  # default value for quick analysis; replace with the number of sequences you want
 sequences = []
 
-with open(full_reference_seqs_file,"w") as fh:
-  for reference_fasta in reference_files:
-    for name, seq in zip(*parse_fasta(reference_fasta, return_names=True, clean="unalign")):
-      print(f">{name}\n{seq}", file=fh)
-      sequences.append((name, seq))
-
 with open(raw_reference_seqs_file,"w") as fh:
   for reference_fasta in reference_files:
     for name, seq in zip(*parse_fasta(reference_fasta, return_names=True, clean=None, full_name=True)):
       print(f">{name}\n{seq}", file=fh)
-      sequences.append((name, seq))
+
+with open(full_reference_seqs_file,"w") as fh:
+  for reference_fasta in reference_files:
+    for name, seq in zip(*parse_fasta(reference_fasta, return_names=True, clean="unalign")):
+      print(f">{name}\n{seq}", file=fh)
+      sequences.append((name, seq)) if len(seq) == len(args.orig_seq) else None
 
 sample_size = min(n, len(sequences))
 selected_sequences = random.sample(sequences, sample_size)

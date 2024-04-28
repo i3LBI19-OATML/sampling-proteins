@@ -36,14 +36,16 @@ def ESM_MSA(target_seqs_file, reference_seqs_file, results, orig_seq, msa_weight
 
       df_target = pd.DataFrame({"id":seq_name, "sequence":seq})
       # identify mutations
+      df_target = df_target[df_target['sequence'].apply(lambda x: len(x) == len(orig_seq))]
       df_target['mutant'] = df_target['sequence'].apply(lambda x: identify_mutation(orig_seq, x, sep=":"))
+      # remove nan
+      df_target = df_target.dropna(subset=['mutant'])
 
       # create a temp file path for target csv and reference MSA
       with tempfile.TemporaryDirectory() as temp_dir:
         df_target.to_csv(os.path.join(temp_dir, "target.csv"), index=False)
         df_target = os.path.join(temp_dir, "target.csv")
 
-        # TODO: Add arguments for ProteinGym --> Convert fasta to df, get mutation column, get msa path, get msa weights folder, get dms input
         proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--dms-input", os.path.join(temp_dir, "target.csv"), "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", "/users/jerwan/esm_msa1b_t12_100M_UR50S.pt", "--msa-path", reference_seqs_file, "--msa-weights-folder", msa_weights, "--filter-msa", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     except subprocess.CalledProcessError as e:

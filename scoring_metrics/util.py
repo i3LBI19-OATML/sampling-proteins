@@ -2,6 +2,7 @@ from biotite.structure import get_residue_count
 from biotite.structure.residues import get_residues
 from biotite.structure.io import pdb
 from biotite.sequence import ProteinSequence
+import numpy as np
 
 def add_metric(metrics_dict, protein_name, metric_name, value):
   if protein_name not in metrics_dict:
@@ -26,7 +27,10 @@ def identify_mutation(reference, target, sep=','):
     str2vec = list(target)
     assert len(str1vec) == len(str2vec), 'Sequence lengths must be equal'
     iMut = [i for i in range(len(str1vec)) if str1vec[i] != str2vec[i]]
-    return f'{sep}'.join([str1vec[i] + str(i+1) + str2vec[i] for i in iMut])
+    if len(iMut) == 0:
+        return np.nan
+    else:
+        return f'{sep}'.join([str1vec[i] + str(i+1) + str2vec[i] for i in iMut])
 
 def extract_mutations(mutation_string, offset=0):
   """
