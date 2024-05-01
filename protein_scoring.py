@@ -6,6 +6,7 @@ import pandas as pd
 import os
 import argparse
 from random import randint
+import tempfile
 
 from scoring_metrics import structure_metrics as st_metrics
 from scoring_metrics import single_sequence_metrics as ss_metrics
@@ -122,78 +123,76 @@ rand_id = randint(10000, 99999) # Necessary for parallelization
 print(f"Using random ID {rand_id} for temporary files")
 
 # Temporary files
-reference_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/random_unalign_ref_cache/reference_seqs_{rand_id}.fasta")
-full_reference_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/unalign_ref_cache/full_reference_seqs_{rand_id}.fasta")
-raw_reference_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/raw_ref_cache/raw_reference_seqs_{rand_id}.fasta")
-target_seqs_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"scoring_metrics/tmp/target_cache/target_seqs_{rand_id}.fasta")
+with tempfile.TemporaryDirectory() as output_dir:
+  for directory in ["random_unalign_ref_cache", "unalign_ref_cache", "raw_ref_cache", "target_cache"]:
+    os.makedirs(os.path.join(output_dir, directory), exist_ok=True)
+    
+  reference_seqs_file = os.path.join(output_dir, f"random_unalign_ref_cache/reference_seqs_{rand_id}.fasta")
+  full_reference_seqs_file = os.path.join(output_dir, f"unalign_ref_cache/full_reference_seqs_{rand_id}.fasta")
+  raw_reference_seqs_file = os.path.join(output_dir, f"raw_ref_cache/raw_reference_seqs_{rand_id}.fasta")
+  target_seqs_file = os.path.join(output_dir, f"target_cache/target_seqs_{rand_id}.fasta")
 
-# create dir
-os.makedirs(os.path.dirname(os.path.realpath(reference_seqs_file))) if not os.path.exists(os.path.dirname(os.path.realpath(reference_seqs_file))) else None
-os.makedirs(os.path.dirname(os.path.realpath(full_reference_seqs_file))) if not os.path.exists(os.path.dirname(os.path.realpath(full_reference_seqs_file))) else None
-os.makedirs(os.path.dirname(os.path.realpath(raw_reference_seqs_file))) if not os.path.exists(os.path.dirname(os.path.realpath(raw_reference_seqs_file))) else None
-os.makedirs(os.path.dirname(os.path.realpath(target_seqs_file))) if not os.path.exists(os.path.dirname(os.path.realpath(target_seqs_file))) else None
+  # Reference sequences
+  # concatenate reference sequences
+  n = 400  # default value for quick analysis; replace with the number of sequences you want
+  sequences = []
 
-# Reference sequences
-# concatenate reference sequences
-n = 400  # default value for quick analysis; replace with the number of sequences you want
-sequences = []
-
-with open(raw_reference_seqs_file,"w") as fh:
-  for reference_fasta in reference_files:
-    for name, seq in zip(*parse_fasta(reference_fasta, return_names=True, clean=None, full_name=True)):
-      print(f">{name}\n{seq}", file=fh)
-
-with open(full_reference_seqs_file,"w") as fh:
-  for reference_fasta in reference_files:
-    for name, seq in zip(*parse_fasta(reference_fasta, return_names=True, clean="unalign")):
-      print(f">{name}\n{seq}", file=fh)
-      sequences.append((name, seq)) if len(seq) == len(args.orig_seq) else None
-
-sample_size = min(n, len(sequences))
-selected_sequences = random.sample(sequences, sample_size)
-print(f"Selected {sample_size} sequences from {len(sequences)} sequences")
-with open(reference_seqs_file,"w") as fh:
-    for name, seq in selected_sequences:
+  with open(raw_reference_seqs_file,"w") as fh:
+    for reference_fasta in reference_files:
+      for name, seq in zip(*parse_fasta(reference_fasta, return_names=True, clean=None, full_name=True)):
         print(f">{name}\n{seq}", file=fh)
 
-# Target sequences
-with open(target_seqs_file,"w") as fh:
-  for target_fasta in target_files:
-    for name, seq in zip(*parse_fasta(target_fasta, return_names=True, clean="unalign")):
-      print(f">{name}\n{seq}", file=fh)
+  with open(full_reference_seqs_file,"w") as fh:
+    for reference_fasta in reference_files:
+      for name, seq in zip(*parse_fasta(reference_fasta, return_names=True, clean="unalign")):
+        print(f">{name}\n{seq}", file=fh)
+        sequences.append((name, seq)) if len(seq) == len(args.orig_seq) else None
 
-alignment_time = time.time()
-ab_metrics.ESM_MSA(target_seqs_file, raw_reference_seqs_file, results, orig_seq=args.orig_seq.upper(), msa_weights=msa_weights_files)
-ab_metrics.substitution_score(target_seqs_file, reference_seqs_file,
-                              substitution_matrix=sub_matrix, 
-                              Substitution_matrix_score_mean_of_mutated_positions=score_mean, 
-                              Identity_to_closest_reference=identity,
-                              results=results,
-                              gap_open=sub_gap_open,
-                              gap_extend=sub_gap_extend,)
-print(f"Alignment-based metrics took {time.time() - alignment_time} seconds")
+  sample_size = min(n, len(sequences))
+  selected_sequences = random.sample(sequences, sample_size)
+  print(f"Selected {sample_size} sequences from {len(sequences)} sequences")
+  with open(reference_seqs_file,"w") as fh:
+      for name, seq in selected_sequences:
+          print(f">{name}\n{seq}", file=fh)
 
-if args.use_evmutation:
-  ab_metrics.EVmutation(target_files=target_files, orig_seq=args.orig_seq.upper(), results=results, model_params=args.model_params)
+  # Target sequences
+  with open(target_seqs_file,"w") as fh:
+    for target_fasta in target_files:
+      for name, seq in zip(*parse_fasta(target_fasta, return_names=True, clean="unalign")):
+        print(f">{name}\n{seq}", file=fh)
 
-# Single sequence metrics
-# ESM-1v, ESM-1v-mask6, CARP-640m-logp, Repeat-1, Repeat-2, Repeat-3, Repeat-4, Tranception
+  alignment_time = time.time()
+  ab_metrics.ESM_MSA(target_seqs_file, raw_reference_seqs_file, results, orig_seq=args.orig_seq.upper(), msa_weights=msa_weights_files)
+  ab_metrics.substitution_score(target_seqs_file, reference_seqs_file,
+                                substitution_matrix=sub_matrix, 
+                                Substitution_matrix_score_mean_of_mutated_positions=score_mean, 
+                                Identity_to_closest_reference=identity,
+                                results=results,
+                                gap_open=sub_gap_open,
+                                gap_extend=sub_gap_extend,)
+  print(f"Alignment-based metrics took {time.time() - alignment_time} seconds")
 
-repeat_score = dict()
-repeat_score['repeat_1'] = args.remove_repeat_score_1
-repeat_score['repeat_2'] = args.remove_repeat_score_2
-repeat_score['repeat_3'] = args.remove_repeat_score_3
-repeat_score['repeat_4'] = args.remove_repeat_score_4
+  if args.use_evmutation:
+    ab_metrics.EVmutation(target_files=target_files, orig_seq=args.orig_seq.upper(), results=results, model_params=args.model_params)
 
-single_time = time.time()
-ss_metrics.CARP_640m_logp(target_seqs_file, results, device)
-esm1v_pred = ss_metrics.ESM_1v(target_seqs_file, results, device, return_pred=True, orig_seq=args.orig_seq.upper())
-ss_metrics.ESM_1v_mask6(target_files, results, device)
-ss_metrics.Repeat(target_files, repeat_score, results)
-if args.use_tranception:
-  past_key_values = None
-  past_key_values = ss_metrics.Tranception(target_files=target_files, orig_seq=args.orig_seq.upper(), results=results, device=device, model_type="Large", local_model=os.path.expanduser("~/Tranception_Large"))
-print(f"Single sequence metrics took {time.time() - single_time} seconds")
+  # Single sequence metrics
+  # ESM-1v, ESM-1v-mask6, CARP-640m-logp, Repeat-1, Repeat-2, Repeat-3, Repeat-4, Tranception
+
+  repeat_score = dict()
+  repeat_score['repeat_1'] = args.remove_repeat_score_1
+  repeat_score['repeat_2'] = args.remove_repeat_score_2
+  repeat_score['repeat_3'] = args.remove_repeat_score_3
+  repeat_score['repeat_4'] = args.remove_repeat_score_4
+
+  single_time = time.time()
+  ss_metrics.CARP_640m_logp(target_seqs_file, results, device)
+  esm1v_pred = ss_metrics.ESM_1v(target_seqs_file, results, device, return_pred=True, orig_seq=args.orig_seq.upper())
+  ss_metrics.ESM_1v_mask6(target_files, results, device)
+  ss_metrics.Repeat(target_files, repeat_score, results)
+  if args.use_tranception:
+    past_key_values = None
+    past_key_values = ss_metrics.Tranception(target_files=target_files, orig_seq=args.orig_seq.upper(), results=results, device=device, model_type="Large", local_model=os.path.expanduser("~/Tranception_Large"))
+  print(f"Single sequence metrics took {time.time() - single_time} seconds")
 
 # Download results
 df = pd.DataFrame.from_dict(results, orient="index")
@@ -205,10 +204,10 @@ if not args.skip_FID:
 else:
   fretchet_score = None
 
-# delete temporary files
-os.remove(reference_seqs_file)
-os.remove(full_reference_seqs_file)
-os.remove(target_seqs_file)
+# # delete temporary files
+# os.remove(reference_seqs_file)
+# os.remove(full_reference_seqs_file)
+# os.remove(target_seqs_file)
 
 if score_structure:
   save_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "{}.csv".format(args.output_name))

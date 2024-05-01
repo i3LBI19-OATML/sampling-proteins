@@ -47,6 +47,8 @@ def extract_mutations(mutation_string, offset=0):
   list of tuples
       List of tuples of the form (index+offset, from, to)
   """
+  # if mutation_string is np.nan, consider as wild type
+  mutation_string = "" if mutation_string is np.nan else mutation_string
   if mutation_string.lower() not in ["wild", "wt", ""]:
       mutations = mutation_string.split(",")
       return list(map(
