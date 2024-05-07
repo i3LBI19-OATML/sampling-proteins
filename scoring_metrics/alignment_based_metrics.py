@@ -39,14 +39,18 @@ def ESM_MSA(target_seqs_file, reference_seqs_file, results, orig_seq, msa_weight
       df_target = df_target[df_target['sequence'].apply(lambda x: len(x) == len(orig_seq))]
       df_target['mutant'] = df_target['sequence'].apply(lambda x: identify_mutation(orig_seq, x, sep=":"))
       # remove nan
-      df_target = df_target.dropna(subset=['mutant'])
+      df_target = df_target[df_target['mutant'] != np.nan]
+      df_perfect_target = df_target[df_target['mutant'] == np.nan]
 
-      # create a temp file path for target csv and reference MSA
-      with tempfile.TemporaryDirectory() as temp_dir:
-        df_target.to_csv(os.path.join(temp_dir, "target.csv"), index=False)
-        df_target = os.path.join(temp_dir, "target.csv")
+      if df_target.shape[0] > 0:
+        # create a temp file path for target csv and reference MSA
+        with tempfile.TemporaryDirectory() as temp_dir:
+          df_target.to_csv(os.path.join(temp_dir, "target.csv"), index=False)
+          df_target = os.path.join(temp_dir, "target.csv")
 
-        proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--dms-input", os.path.join(temp_dir, "target.csv"), "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", "/users/jerwan/esm_msa1b_t12_100M_UR50S.pt", "--msa-path", reference_seqs_file, "--msa-weights-folder", msa_weights, "--filter-msa", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+          proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--dms-input", df_target, "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", "/users/jerwan/esm_msa1b_t12_100M_UR50S.pt", "--msa-path", reference_seqs_file, "--msa-weights-folder", msa_weights, "--filter-msa", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+      else:
+        outfile = None
 
     except subprocess.CalledProcessError as e:
       print(e.stderr.decode('utf-8'))
@@ -57,7 +61,13 @@ def ESM_MSA(target_seqs_file, reference_seqs_file, results, orig_seq, msa_weight
     # print(proc.stdout)
     # print(proc.stderr)
 
-    df = pd.read_csv(outfile)
+    df = pd.read_csv(outfile) if outfile else pd.DataFrame()
+    if df_perfect_target.shape[0] > 0:
+      df_perfect_target['esm_msa1b_t12_100M_UR50S_ensemble'] = 1
+      df = pd.concat([df, df_perfect_target], ignore_index=True)
+      df = df.drop_duplicates(subset=['id'])
+      print(f'ESM-MSA result.shape: {df.shape} (should be 100)')
+
     # print(f'ESM-MSA.columns: {df.columns}')
     # print(f'P-Gym ESM-MSA results: {df.head()}')
     for i, row in df.iterrows():

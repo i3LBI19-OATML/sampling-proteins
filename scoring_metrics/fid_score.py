@@ -46,49 +46,77 @@ except ImportError:
     def tqdm(x):
         return x
 
-def get_ESM1v_predictions(targets_fasta, orig_seq, device='cuda:0'):
+# def get_ESM1v_predictions(targets_fasta, orig_seq, device='cuda:0'):
+#     pred_arr = []
+#     if device=='cuda:0':
+#         torch.cuda.empty_cache()
+#     # print(f'target_files:{target_files}')
+#     # print(f'target_fasta:{targets_fasta}')
+#     with tempfile.TemporaryDirectory() as output_dir:
+#         outfile = output_dir + "/esm_results.csv"
+#         try:
+#             # proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm.py"), "-i", targets_fasta, "-o", outfile, "--model", "esm1v", "--masking_off", "--score_name", "score", "--device", "gpu", "--use_repr"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+#             # ProteinGym Version
+#             seq_name, seq = parse_fasta(targets_fasta,return_names=True, clean="unalign")
+#             # ref_name, ref = parse_fasta(reference_seqs_file,return_names=True, clean="unalign")
+
+#             df_target = pd.DataFrame({"id":seq_name, "sequence":seq})
+#             print(f"FID-ESM1v bef len filter: {len(df_target)}")
+#             # identify mutations
+#             # filter sequence with length same as orig_seq
+#             df_target = df_target[df_target['sequence'].apply(lambda x: len(x) == len(orig_seq))]
+#             print(f"FID-ESM1v aft len filter: {len(df_target)}")
+#             df_target['mutant'] = df_target['sequence'].apply(lambda x: identify_mutation(orig_seq, x, sep=":"))
+#             # remove rows with NaN mutant
+#             df_target = df_target.dropna(subset=['mutant']) # assuming there are others that are not identical to orig_seq
+#             print(f"FID-ESM1v aft nan filter: {len(df_target)}")
+
+#             with tempfile.TemporaryDirectory() as temp_dir:
+#                 df_target.to_csv(os.path.join(temp_dir, "target.csv"), index=False)
+#                 df_target = os.path.join(temp_dir, "target.csv")
+
+#                 # print(f'FID ESM1v:')
+#                 proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--model_type", "ESM1v", "--dms-input", df_target, "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", "/users/jerwan/esm1v_t33_650M_UR90S_1.pt", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+#         except subprocess.CalledProcessError as e:
+#             print(e.stderr.decode('utf-8'))
+#             print(e.stdout.decode('utf-8'))
+#             raise e
+        
+#         # debug
+#         # print(proc.stdout)
+#         # print(proc.stderr)
+#         df = pd.read_csv(outfile)
+#         print("ESM1v FID done")
+#         for i, row in df.iterrows():
+#             p = row['Ensemble_ESM1v']
+#             pred_arr.append(p)
+#     # print(pred_arr)
+#     return pred_arr
+
+def get_ESM1v_predictions(targets_fasta, device = 'cuda:0'):
     pred_arr = []
     if device=='cuda:0':
         torch.cuda.empty_cache()
     # print(f'target_files:{target_files}')
+    # for targets_fasta in [target_files]:
     # print(f'target_fasta:{targets_fasta}')
     with tempfile.TemporaryDirectory() as output_dir:
-        outfile = output_dir + "/esm_results.csv"
+        outfile = output_dir + "/esm_results.tsv"
         try:
-            # proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm.py"), "-i", targets_fasta, "-o", outfile, "--model", "esm1v", "--masking_off", "--score_name", "score", "--device", "gpu", "--use_repr"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-
-            # ProteinGym Version
-            seq_name, seq = parse_fasta(targets_fasta,return_names=True, clean="unalign")
-            # ref_name, ref = parse_fasta(reference_seqs_file,return_names=True, clean="unalign")
-
-            df_target = pd.DataFrame({"id":seq_name, "sequence":seq})
-            # identify mutations
-            # filter sequence with length same as orig_seq
-            df_target = df_target[df_target['sequence'].apply(lambda x: len(x) == len(orig_seq))]
-            df_target['mutant'] = df_target['sequence'].apply(lambda x: identify_mutation(orig_seq, x, sep=":"))
-            # remove rows with NaN mutant
-            df_target = df_target.dropna(subset=['mutant'])
-            # print(f"NaNs in df_target ESM1v: {df_target.isnull().sum()}")
-
-            with tempfile.TemporaryDirectory() as temp_dir:
-                df_target.to_csv(os.path.join(temp_dir, "target.csv"), index=False)
-                df_target = os.path.join(temp_dir, "target.csv")
-
-                # print(f'FID ESM1v:')
-                proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--model_type", "ESM1v", "--dms-input", os.path.join(temp_dir, "target.csv"), "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", "/users/jerwan/esm1v_t33_650M_UR90S_1.pt", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            
+            proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm.py"), "-i", targets_fasta, "-o", outfile, "--model", "esm1v", "--masking_off", "--score_name", "score", "--device", "gpu", "--use_repr"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            # print(proc.stdout)
+            # print(proc.stderr)
         except subprocess.CalledProcessError as e:
-            print(e.stderr.decode('utf-8'))
             print(e.stdout.decode('utf-8'))
+            print(e.stderr.decode('utf-8'))
             raise e
-        
-        # debug
-        # print(proc.stdout)
-        # print(proc.stderr)
-        df = pd.read_csv(outfile)
-        print("ESM1v FID done")
+            
+        df = pd.read_table(outfile)
+        print("done")
         for i, row in df.iterrows():
-            p = row['Ensemble_ESM1v']
+            p = row['score']
             pred_arr.append(p)
     # print(pred_arr)
     return pred_arr
@@ -155,25 +183,9 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
 
 
 def calculate_activation_statistics(files, orig_seq, device='cuda:0', num_workers=8):
-    """Calculation of the statistics used by the FID.
-    Params:
-    -- files       : List of image files paths
-    -- model       : Instance of inception model
-    -- batch_size  : The images numpy array is split into batches with
-                     batch size batch_size. A reasonable batch size
-                     depends on the hardware.
-    -- dims        : Dimensionality of features returned by Inception
-    -- device      : Device to run calculations
-    -- num_workers : Number of parallel dataloader workers
-
-    Returns:
-    -- mu    : The mean over samples of the activations of the pool_3 layer of
-               the inception model.
-    -- sigma : The covariance matrix of the activations of the pool_3 layer of
-               the inception model.
-    """
     # act = get_activations(files, model, batch_size, dims, device, num_workers)
-    act = get_ESM1v_predictions(files, orig_seq, device)
+    # act = get_ESM1v_predictions(files, orig_seq, device)
+    act = get_ESM1v_predictions(files, device)
     mu = np.mean(act, axis=0)
     sigma = np.cov(act, rowvar=False)
     return mu, sigma
@@ -194,13 +206,15 @@ def calculate_fid_given_paths(target_files, reference_files, name, orig_seq, dev
     # print(f'target_files:{target_files}, reference_files:{reference_files}')
     # Target statistics
     if type(target_files) is list and len(target_files) > 0:
+        print(f'Using precomputed target statistics for {name}')
         m1, s1 = compute_statistics_of_path(target_files, device, num_workers)
     else:
+        print(f'Calculating target statistics for {target_files} (Source: {target_files})')
         m1, s1 = calculate_activation_statistics(target_files, orig_seq, device, num_workers)
 
     # Reference statistics
     reference_name = pathlib.Path(name).stem
-    cache_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"tmp/reference_cache/{reference_name}.npy")
+    cache_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"tmp/FID_reference_cache/{reference_name}.npy")
     if os.path.exists(cache_file):
         print(f"Loading reference statistics from {cache_file}")
         m2, s2 = np.load(cache_file, allow_pickle=True)

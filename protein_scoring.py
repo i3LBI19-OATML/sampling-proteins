@@ -84,6 +84,7 @@ if score_structure:
   pdb_files = glob(pdb_dir + "/*.pdb")
   reference_pdb_files = glob(ref_pdb_dir + "/*.pdb")
 reference_files = glob(reference_dir + "/*.fasta")
+# msat_reference_files = glob(reference_dir + "/*.csv")
 target_files = glob(target_dir + "/*.fasta")
 msa_weights_files = glob(msa_weights_dir + "/*.npy")[0]
 
@@ -91,8 +92,18 @@ if score_structure:
   assert len(pdb_files) > 0, f"No pdb files found in {pdb_dir}"
   assert len(reference_pdb_files) > 0, f"No reference pdb files found in {ref_pdb_dir}"
 assert len(reference_files) > 0, f"No reference fasta files found in {reference_dir}"
+# assert len(msat_reference_files) > 0, f"No reference csv files (for MSAT) found in {reference_dir}"
 assert len(target_files) > 0, f"No target fasta files found in {target_dir}"
 assert len(msa_weights_files) > 0, f"No MSA weights files found in {msa_weights_dir}"
+
+# # Combine msat reference files and delete individual files
+# msat_reference_file = os.path.join(reference_dir, "reference_seqs.csv")
+# if len(msat_reference_files) > 1:
+#   print(f"Found multiple reference csv files, combining them into {msat_reference_file}")
+#   df = pd.concat([pd.read_csv(file) for file in msat_reference_files])
+#   df.to_csv(msat_reference_file, index=False)
+#   for file in msat_reference_files:
+#     os.remove(file)
 
 if score_structure:
 # Structure metrics
@@ -146,7 +157,7 @@ with tempfile.TemporaryDirectory() as output_dir:
     for reference_fasta in reference_files:
       for name, seq in zip(*parse_fasta(reference_fasta, return_names=True, clean="unalign")):
         print(f">{name}\n{seq}", file=fh)
-        sequences.append((name, seq)) if len(seq) == len(args.orig_seq) else None
+        sequences.append((name, seq)) # if len(seq) == len(args.orig_seq) else None
 
   sample_size = min(n, len(sequences))
   selected_sequences = random.sample(sequences, sample_size)
@@ -186,7 +197,7 @@ with tempfile.TemporaryDirectory() as output_dir:
 
   single_time = time.time()
   ss_metrics.CARP_640m_logp(target_seqs_file, results, device)
-  esm1v_pred = ss_metrics.ESM_1v(target_seqs_file, results, device, return_pred=True, orig_seq=args.orig_seq.upper())
+  ss_metrics.ESM_1v(target_seqs_file, results, device, return_pred=False, orig_seq=args.orig_seq.upper())
   ss_metrics.ESM_1v_mask6(target_files, results, device)
   ss_metrics.Repeat(target_files, repeat_score, results)
   if args.use_tranception:
@@ -194,15 +205,16 @@ with tempfile.TemporaryDirectory() as output_dir:
     past_key_values = ss_metrics.Tranception(target_files=target_files, orig_seq=args.orig_seq.upper(), results=results, device=device, model_type="Large", local_model=os.path.expanduser("~/Tranception_Large"))
   print(f"Single sequence metrics took {time.time() - single_time} seconds")
 
-# Download results
-df = pd.DataFrame.from_dict(results, orient="index")
-if not args.skip_FID:
-  fid_time = time.time()
-  fretchet_score = fid.calculate_fid_given_paths(esm1v_pred, full_reference_seqs_file, device=device, name=reference_dir, orig_seq=args.orig_seq.upper())
-  df["FID"] = fretchet_score
-  print(f"FID took {time.time() - fid_time} seconds")
-else:
-  fretchet_score = None
+  # Download results
+  df = pd.DataFrame.from_dict(results, orient="index")
+  if not args.skip_FID:
+    fid_time = time.time()
+    # fretchet_score = fid.calculate_fid_given_paths(esm1v_pred, full_reference_seqs_file, device=device, name=reference_dir, orig_seq=args.orig_seq.upper())
+    fretchet_score = fid.calculate_fid_given_paths(target_seqs_file, full_reference_seqs_file, device=device, name=reference_dir, orig_seq=args.orig_seq.upper())
+    df["FID"] = fretchet_score
+    print(f"FID took {time.time() - fid_time} seconds")
+  else:
+    fretchet_score = None
 
 # # delete temporary files
 # os.remove(reference_seqs_file)
