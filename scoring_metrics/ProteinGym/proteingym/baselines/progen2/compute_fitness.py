@@ -15,6 +15,7 @@ from models.progen.modeling_progen import ProGenForCausalLM
 
 ######
 from pgen.utils import parse_fasta
+import glob
 
 
 ########################################################################

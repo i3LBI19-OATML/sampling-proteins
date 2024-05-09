@@ -19,7 +19,6 @@ from pgen.utils import parse_fasta
 import os
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 import numpy as np
-import wget
 
 from transformers import PreTrainedTokenizerFast
 import tranception
@@ -102,17 +101,6 @@ def Progen2(target_files, results, device): #TODO: allow other devices?
     outfile = output_dir + "/progen2_results.csv"
     try:      
       # ProteinGym Version
-      model = 'progen2-base'
-      # if model is not found locally, then download
-      savepath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'tmp/models/progen2')
-      if not os.path.exists(savepath):
-        os.makedirs(savepath, exist_ok=True)
-        url = f'https://storage.googleapis.com/sfr-progen-research/checkpoints/{model}.tar.gz'
-        filename = wget.download(url, out=savepath)
-        tar = tarfile.open(f"{savepath}/{model}.tar.gz")
-        tar.extractall(path=savepath)
-        tar.close()
-
       seq_name, seq = parse_fasta(target_files,return_names=True, clean="unalign")
       # ref_name, ref = parse_fasta(reference_seqs_file,return_names=True, clean="unalign")
 
@@ -122,7 +110,7 @@ def Progen2(target_files, results, device): #TODO: allow other devices?
         df_target.to_csv(os.path.join(temp_dir, "target.csv"), index=False)
         df_target = os.path.join(temp_dir, "target.csv")
 
-        proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/progen2/compute_fitness.py"), "--DMS_data_folder", os.path.join(temp_dir, "target.csv"), "--output_scores_folder", outfile, "--Progen2_model_name_or_path", savepath, "--indel_mode"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/progen2/compute_fitness.py"), "--DMS_data_folder", os.path.join(temp_dir, "target.csv"), "--output_scores_folder", outfile, "--Progen2_model_name_or_path", "/users/jerwan/progen2-base", "--indel_mode"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
     except subprocess.CalledProcessError as e:
       print(e.stderr.decode('utf-8'))
