@@ -143,13 +143,22 @@ def main():
     # target_seq = mapping_protein_seq_DMS["target_seq"][mapping_protein_seq_DMS["DMS_id"]==DMS_id].values[0].upper()
     # if file ends with .fasta, create csv from it
 
-    if args.DMS_data_folder.endswith(".fasta"):
-        seq_name, seq = parse_fasta(target_files,return_names=True, clean="unalign")
-        DMS_data = pd.DataFrame({"id":seq_name, "mutated_sequence":seq})
-    elif args.DMS_data_folder.endswith(".csv"):
-        DMS_data = pd.read_csv(args.DMS_data_folder, low_memory=False)
-    else:
-        print("Please provide a valid file format for DMS_data_folder")
+    # check if folder is a directory
+    if os.path.isdir(args.DMS_data_folder):
+        fasta_files = glob.glob(os.path.join(args.DMS_data_folder, '*.fasta'))
+        data_list = []
+        for fasta_file in fasta_files:
+            seq_name, seq = parse_fasta(fasta_file, return_names=True, clean="unalign")
+            data_list.extend([{"id": name, "mutated_sequence": sequence} for name, sequence in zip(seq_name, seq)])
+        DMS_data = pd.DataFrame(data_list)
+    else: # if file
+        if args.DMS_data_folder.endswith(".fasta"):
+            seq_name, seq = parse_fasta(args.DMS_data_folder, return_names=True, clean="unalign")
+            DMS_data = pd.DataFrame({"id":seq_name, "mutated_sequence":seq})
+        elif args.DMS_data_folder.endswith(".csv"):
+            DMS_data = pd.read_csv(args.DMS_data_folder, low_memory=False)
+        else:
+            print("Please provide a valid file format for DMS_data_folder")
 
     if not args.indel_mode and "mutated_sequence" not in DMS_data.columns:
         DMS_data['mutated_sequence'] = DMS_data['mutant'].apply(lambda x: get_mutated_sequence(target_seq, x)) # if not args.indel_mode else DMS_data['mutant'].map(lambda x: "1"+x+"2")
