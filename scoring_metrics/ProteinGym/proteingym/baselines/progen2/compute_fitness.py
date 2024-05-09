@@ -13,6 +13,9 @@ from torch.nn import CrossEntropyLoss
 from tokenizers import Tokenizer
 from models.progen.modeling_progen import ProGenForCausalLM
 
+######
+from pgen.utils import parse_fasta
+
 
 ########################################################################
 # model
@@ -115,9 +118,9 @@ def main():
 
     parser = argparse.ArgumentParser(description='Tranception scoring')
     parser.add_argument('--Progen2_model_name_or_path', default="/n/groups/marks/projects/marks_lab_and_oatml/protein_transformer/baseline_models/progen2/progen2-small", type=str, help='Name of or path to Progen2 model')
-    parser.add_argument('--DMS_reference_file_path', default='/home/pn73/Tranception/proteingym/ProteinGym_reference_file_substitutions.csv', type=str, help='Path of DMS folder')
+    # parser.add_argument('--DMS_reference_file_path', default='/home/pn73/Tranception/proteingym/ProteinGym_reference_file_substitutions.csv', type=str, help='Path of DMS folder')
     parser.add_argument('--DMS_data_folder', default='/n/groups/marks/projects/marks_lab_and_oatml/protein_transformer/Tranception_open_source/DMS_files/ProteinGym_substitutions', type=str, help='Path of DMS folder')
-    parser.add_argument('--DMS_index', type=int, help='Path of DMS folder')
+    # parser.add_argument('--DMS_index', type=int, help='Path of DMS folder')
     parser.add_argument('--output_scores_folder', default=None, type=str, help='Name of folder to write model scores to')
     parser.add_argument('--indel_mode', action='store_true', help='Whether to score sequences with insertions and deletions')
     parser.add_argument('--fp16', action='store_true', help='Whether to score sequences with half precision')
@@ -132,14 +135,22 @@ def main():
     tokenizer_path = os.path.join(dir_path, 'tokenizer.json')
     tokenizer = create_tokenizer_custom(file=tokenizer_path)
 
-    mapping_protein_seq_DMS = pd.read_csv(args.DMS_reference_file_path)
-    list_DMS = mapping_protein_seq_DMS["DMS_id"]
-    DMS_id=list_DMS[args.DMS_index]
-    print("Computing scores for: {} with Progen2: {}".format(DMS_id, args.Progen2_model_name_or_path))
-    DMS_file_name = mapping_protein_seq_DMS["DMS_filename"][mapping_protein_seq_DMS["DMS_id"]==DMS_id].values[0]
-    target_seq = mapping_protein_seq_DMS["target_seq"][mapping_protein_seq_DMS["DMS_id"]==DMS_id].values[0].upper()
-    
-    DMS_data = pd.read_csv(args.DMS_data_folder + os.sep + DMS_file_name, low_memory=False)
+    # mapping_protein_seq_DMS = pd.read_csv(args.DMS_reference_file_path)
+    # list_DMS = mapping_protein_seq_DMS["DMS_id"]
+    # DMS_id=list_DMS[args.DMS_index]
+    # print("Computing scores for: {} with Progen2: {}".format(DMS_id, args.Progen2_model_name_or_path))
+    # DMS_file_name = mapping_protein_seq_DMS["DMS_filename"][mapping_protein_seq_DMS["DMS_id"]==DMS_id].values[0]
+    # target_seq = mapping_protein_seq_DMS["target_seq"][mapping_protein_seq_DMS["DMS_id"]==DMS_id].values[0].upper()
+    # if file ends with .fasta, create csv from it
+
+    if args.DMS_data_folder.endswith(".fasta"):
+        seq_name, seq = parse_fasta(target_files,return_names=True, clean="unalign")
+        DMS_data = pd.DataFrame({"id":seq_name, "mutated_sequence":seq})
+    elif args.DMS_data_folder.endswith(".csv"):
+        DMS_data = pd.read_csv(args.DMS_data_folder, low_memory=False)
+    else:
+        print("Please provide a valid file format for DMS_data_folder")
+
     if not args.indel_mode and "mutated_sequence" not in DMS_data.columns:
         DMS_data['mutated_sequence'] = DMS_data['mutant'].apply(lambda x: get_mutated_sequence(target_seq, x)) # if not args.indel_mode else DMS_data['mutant'].map(lambda x: "1"+x+"2")
 
@@ -163,8 +174,12 @@ def main():
     model_scores = calc_fitness(model=model, prots=np.array(DMS_data['mutated_sequence']), model_context_len=int(config['n_positions']), tokenizer=tokenizer, fp16=args.fp16)
     
     DMS_data['Progen2_score']=model_scores
-    scoring_filename = args.output_scores_folder+os.sep+DMS_id+'.csv'
-    DMS_data[['mutant','Progen2_score','DMS_score']].to_csv(scoring_filename, index=False)
+    if args.output_scores_folder.endswith(".csv"):
+        scoring_filename = args.output_scores_folder
+    else:
+        scoring_filename = args.output_scores_folder+os.sep+'Progen2_results.csv'
+    # DMS_data[['mutant','Progen2_score','DMS_score']].to_csv(scoring_filename, index=False)
+    DMS_data[['id', 'mutated_sequence','Progen2_score']].to_csv(scoring_filename, index=False)
 
 if __name__ == '__main__':
     main()

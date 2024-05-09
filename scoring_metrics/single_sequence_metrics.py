@@ -19,6 +19,7 @@ from pgen.utils import parse_fasta
 import os
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 import numpy as np
+import wget
 
 from transformers import PreTrainedTokenizerFast
 import tranception
@@ -92,6 +93,49 @@ def ESM_1v(target_files, results, device, return_pred, orig_seq): #TODO: allow o
     del df
   if return_pred:
     return pred_arr
+
+# ProGen2
+def Progen2(target_files, results, device): #TODO: allow other devices?
+  if device=='cuda:0':
+    torch.cuda.empty_cache()
+  with tempfile.TemporaryDirectory() as output_dir:
+    outfile = output_dir + "/progen2_results.csv"
+    try:      
+      # ProteinGym Version
+      model = 'progen2-base'
+      # if model is not found locally, then download
+      savepath = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'tmp/models/progen2')
+      if not os.path.exists(savepath):
+        os.makedirs(savepath, exist_ok=True)
+        url = f'https://storage.googleapis.com/sfr-progen-research/checkpoints/{model}.tar.gz'
+        filename = wget.download(url, out=savepath)
+        tar = tarfile.open(f"{savepath}/{model}.tar.gz")
+        tar.extractall(path=savepath)
+        tar.close()
+
+      seq_name, seq = parse_fasta(target_files,return_names=True, clean="unalign")
+      # ref_name, ref = parse_fasta(reference_seqs_file,return_names=True, clean="unalign")
+
+      df_target = pd.DataFrame({"id":seq_name, "mutated_sequence":seq})
+
+      with tempfile.TemporaryDirectory() as temp_dir:
+        df_target.to_csv(os.path.join(temp_dir, "target.csv"), index=False)
+        df_target = os.path.join(temp_dir, "target.csv")
+
+        proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/progen2/compute_fitness.py"), "--DMS_data_folder", os.path.join(temp_dir, "target.csv"), "--output_scores_folder", outfile, "--Progen2_model_name_or_path", savepath, "--indel_mode"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    
+    except subprocess.CalledProcessError as e:
+      print(e.stderr.decode('utf-8'))
+      print(e.stdout.decode('utf-8'))
+      raise e
+
+    # print(proc.stdout)
+    # print(proc.stderr)
+    df = pd.read_csv(outfile)
+
+    for i, row in df.iterrows():
+      add_metric(results, row["id"], "Progen2", row["Progen2_score"])
+    del df
 
 # ESM1v mask 6
 def ESM_1v_mask6(target_files, results, device): #TODO: allow other devices?

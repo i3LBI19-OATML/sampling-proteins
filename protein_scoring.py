@@ -96,15 +96,6 @@ assert len(reference_files) > 0, f"No reference fasta files found in {reference_
 assert len(target_files) > 0, f"No target fasta files found in {target_dir}"
 assert len(msa_weights_files) > 0, f"No MSA weights files found in {msa_weights_dir}"
 
-# # Combine msat reference files and delete individual files
-# msat_reference_file = os.path.join(reference_dir, "reference_seqs.csv")
-# if len(msat_reference_files) > 1:
-#   print(f"Found multiple reference csv files, combining them into {msat_reference_file}")
-#   df = pd.concat([pd.read_csv(file) for file in msat_reference_files])
-#   df.to_csv(msat_reference_file, index=False)
-#   for file in msat_reference_files:
-#     os.remove(file)
-
 if score_structure:
 # Structure metrics
 # ESM-IF, ProteinMPNN, MIF-ST, AlphaFold2 pLDDT, TM-score
@@ -198,6 +189,7 @@ with tempfile.TemporaryDirectory() as output_dir:
   single_time = time.time()
   ss_metrics.CARP_640m_logp(target_seqs_file, results, device)
   ss_metrics.ESM_1v(target_seqs_file, results, device, return_pred=False, orig_seq=args.orig_seq.upper())
+  ss_metrics.Progen2(target_seqs_file, results, device)
   ss_metrics.ESM_1v_mask6(target_files, results, device)
   ss_metrics.Repeat(target_files, repeat_score, results)
   if args.use_tranception:
