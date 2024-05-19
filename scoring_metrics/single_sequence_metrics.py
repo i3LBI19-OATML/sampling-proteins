@@ -27,9 +27,12 @@ from tranception import model_pytorch
 #CARP
 def CARP_640m_logp(target_seqs_file, results, device): 
   with tempfile.TemporaryDirectory() as output_dir:
-    proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "tmp/extract.py"), "carp_640M", target_seqs_file, output_dir + "/", "--repr_layers", "logits", "--include", "logp", "--device", device], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-    # print(proc.stderr)
-    # print(proc.stdout)
+    try:
+      proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "tmp/extract.py"), "carp_640M", target_seqs_file, output_dir + "/", "--repr_layers", "logits", "--include", "logp", "--device", device], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+    except subprocess.CalledProcessError as e:
+      print(e.stderr.decode('utf-8'))
+      print(e.stdout.decode('utf-8'))
+      raise e
     df = pd.read_table(output_dir + '/carp_640M_logp.tsv')
     df = df.rename(columns={'name': 'id', 'logp': 'carp640m_logp'},)
     for _, row in df.iterrows():
