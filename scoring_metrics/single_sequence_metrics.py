@@ -39,11 +39,10 @@ def CARP_640m_logp(target_seqs_file, results, device):
       add_metric(results, row["id"], "CARP-640m", row["carp640m_logp"])
     del df
 
-# ESM1v (unmasked)
-def ESM_1v(target_files, results, device, return_pred, orig_seq): #TODO: allow other devices?
+# ESM1v (ProteinGym Version)
+def ESM_1v(target_files, results, device, orig_seq): #TODO: allow other devices?
   if device=='cuda:0':
     torch.cuda.empty_cache()
-  pred_arr = []
   with tempfile.TemporaryDirectory() as output_dir:
     outfile = output_dir + "/esm_results.csv"
     try:
@@ -88,13 +87,31 @@ def ESM_1v(target_files, results, device, return_pred, orig_seq): #TODO: allow o
     # print(f'ESM1v.columns: {df.columns}')
     # print(f'P-Gym ESM-1v results: {df[["id", "Ensemble_ESM1v"]].head()}')
     for i, row in df.iterrows():
-      add_metric(results, row["id"], "ESM-1v", row["Ensemble_ESM1v"])
+      add_metric(results, row["id"], "ESM-1v_PGym", row["Ensemble_ESM1v"])
+    del df
+
+# ESM1v (unmasked) - Sean R Johnson version
+def ESM_1v_unmask(targets_fasta, results, device, return_pred=False): #TODO: allow other devices?
+  if device=='cuda:0':
+    torch.cuda.empty_cache()
+  pred_arr = []
+  with tempfile.TemporaryDirectory() as output_dir:
+    outfile = output_dir + "/esm_results.tsv"
+    try:
+      proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm.py"), "-i", targets_fasta, "-o", outfile, "--model", "esm1v", "--masking_off", "--score_name", "score", "--device", "gpu"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+    except subprocess.CalledProcessError as e:
+      print(e.stderr.decode('utf-8'))
+      print(e.stdout.decode('utf-8'))
+      raise e
+    df = pd.read_table(outfile)
+    for i, row in df.iterrows():
+      add_metric(results, row["id"], "ESM-1v", row["score"])
       if return_pred:
-        p = row['Ensemble_ESM1v']
+        p = row['score']
         pred_arr.append(p)
     del df
-  if return_pred:
-    return pred_arr
+    if return_pred:
+      return pred_arr
 
 # ProGen2
 def Progen2(target_files, results, device): #TODO: allow other devices?

@@ -188,7 +188,8 @@ with tempfile.TemporaryDirectory() as output_dir:
 
   single_time = time.time()
   ss_metrics.CARP_640m_logp(target_seqs_file, results, device)
-  ss_metrics.ESM_1v(target_seqs_file, results, device, return_pred=False, orig_seq=args.orig_seq.upper())
+  ss_metrics.ESM_1v(target_seqs_file, results, device, orig_seq=args.orig_seq.upper()) # ProteinGym ESM-1v model
+  esm1v_pred = ss_metrics.ESM_1v_unmask(target_seqs_file, results, device, return_pred=True)
   ss_metrics.Progen2(target_seqs_file, results, device)
   ss_metrics.ESM_1v_mask6(target_files, results, device)
   ss_metrics.Repeat(target_files, repeat_score, results)
@@ -201,8 +202,8 @@ with tempfile.TemporaryDirectory() as output_dir:
   df = pd.DataFrame.from_dict(results, orient="index")
   if not args.skip_FID:
     fid_time = time.time()
-    # fretchet_score = fid.calculate_fid_given_paths(esm1v_pred, full_reference_seqs_file, device=device, name=reference_dir, orig_seq=args.orig_seq.upper())
-    fretchet_score = fid.calculate_fid_given_paths(target_seqs_file, full_reference_seqs_file, device=device, name=reference_dir, orig_seq=args.orig_seq.upper())
+    fretchet_score = fid.calculate_fid_given_paths(esm1v_pred, full_reference_seqs_file, device=device, name=reference_dir, orig_seq=args.orig_seq.upper())
+    # fretchet_score = fid.calculate_fid_given_paths(target_seqs_file, full_reference_seqs_file, device=device, name=reference_dir, orig_seq=args.orig_seq.upper())
     df["FID"] = fretchet_score
     print(f"FID took {time.time() - fid_time} seconds")
   else:

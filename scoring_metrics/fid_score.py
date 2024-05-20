@@ -46,62 +46,10 @@ except ImportError:
     def tqdm(x):
         return x
 
-# def get_ESM1v_predictions(targets_fasta, orig_seq, device='cuda:0'):
-#     pred_arr = []
-#     if device=='cuda:0':
-#         torch.cuda.empty_cache()
-#     # print(f'target_files:{target_files}')
-#     # print(f'target_fasta:{targets_fasta}')
-#     with tempfile.TemporaryDirectory() as output_dir:
-#         outfile = output_dir + "/esm_results.csv"
-#         try:
-#             # proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "protein_gibbs_sampler/src/pgen/likelihood_esm.py"), "-i", targets_fasta, "-o", outfile, "--model", "esm1v", "--masking_off", "--score_name", "score", "--device", "gpu", "--use_repr"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-
-#             # ProteinGym Version
-#             seq_name, seq = parse_fasta(targets_fasta,return_names=True, clean="unalign")
-#             # ref_name, ref = parse_fasta(reference_seqs_file,return_names=True, clean="unalign")
-
-#             df_target = pd.DataFrame({"id":seq_name, "sequence":seq})
-#             print(f"FID-ESM1v bef len filter: {len(df_target)}")
-#             # identify mutations
-#             # filter sequence with length same as orig_seq
-#             df_target = df_target[df_target['sequence'].apply(lambda x: len(x) == len(orig_seq))]
-#             print(f"FID-ESM1v aft len filter: {len(df_target)}")
-#             df_target['mutant'] = df_target['sequence'].apply(lambda x: identify_mutation(orig_seq, x, sep=":"))
-#             # remove rows with NaN mutant
-#             df_target = df_target.dropna(subset=['mutant']) # assuming there are others that are not identical to orig_seq
-#             print(f"FID-ESM1v aft nan filter: {len(df_target)}")
-
-#             with tempfile.TemporaryDirectory() as temp_dir:
-#                 df_target.to_csv(os.path.join(temp_dir, "target.csv"), index=False)
-#                 df_target = os.path.join(temp_dir, "target.csv")
-
-#                 # print(f'FID ESM1v:')
-#                 proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--model_type", "ESM1v", "--dms-input", df_target, "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", "/users/jerwan/esm1v_t33_650M_UR90S_1.pt", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            
-#         except subprocess.CalledProcessError as e:
-#             print(e.stderr.decode('utf-8'))
-#             print(e.stdout.decode('utf-8'))
-#             raise e
-        
-#         # debug
-#         # print(proc.stdout)
-#         # print(proc.stderr)
-#         df = pd.read_csv(outfile)
-#         print("ESM1v FID done")
-#         for i, row in df.iterrows():
-#             p = row['Ensemble_ESM1v']
-#             pred_arr.append(p)
-#     # print(pred_arr)
-#     return pred_arr
-
 def get_ESM1v_predictions(targets_fasta, device = 'cuda:0'):
     pred_arr = []
     if device=='cuda:0':
         torch.cuda.empty_cache()
-    # print(f'target_files:{target_files}')
-    # for targets_fasta in [target_files]:
-    # print(f'target_fasta:{targets_fasta}')
     with tempfile.TemporaryDirectory() as output_dir:
         outfile = output_dir + "/esm_results.tsv"
         try:
