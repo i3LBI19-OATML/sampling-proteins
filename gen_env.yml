@@ -22,6 +22,7 @@ dependencies:
   - biotite
   - importlib_metadata
   - safetensors
+  - huggingface_hub
   - pip:
       # - -e ./protein_bert/
       - pandas==2.0.2
