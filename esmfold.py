@@ -87,7 +87,7 @@ for _, row in tqdm.tqdm(data_df.iterrows(), total=len(data_df)):
   copies = 1 
   if copies == "" or copies <= 0: copies = 1
   sequence = ":".join([sequence] * copies)
-  num_recycles = 3
+  # num_recycles = 3
   chain_linker = 25
 
   if save_to_drive is not None:
