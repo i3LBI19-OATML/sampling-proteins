@@ -24,7 +24,10 @@ def ESM_MSA(target_seqs_file, reference_seqs_file, results, orig_seq, msa_weight
   # rand_id = np.random.randint(100000,100000)
   # msa_result_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"tmp/esm_msa_cache/esm_msa_{rand_id}.csv")
   # os.makedirs(os.path.dirname(os.path.realpath(msa_result_path))) if not os.path.exists(os.path.dirname(os.path.realpath(msa_result_path))) else None
-  
+  # check if model is downloaded
+  if not os.path.isfile(os.path.expanduser("~/esm_msa1b_t12_100M_UR50S.pt")):
+    subprocess.run(['wget', 'https://dl.fbaipublicfiles.com/fair-esm/models/esm_msa1b_t12_100M_UR50S.pt', '-P', os.path.expanduser("~/")], check=True)
+
   with tempfile.TemporaryDirectory() as output_dir:
     outfile = os.path.join(output_dir, "esm_results.csv")
     try:
@@ -48,7 +51,7 @@ def ESM_MSA(target_seqs_file, reference_seqs_file, results, orig_seq, msa_weight
           df_target.to_csv(os.path.join(temp_dir, "target.csv"), index=False)
           df_target = os.path.join(temp_dir, "target.csv")
 
-          proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--dms-input", df_target, "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", "/users/jerwan/esm_msa1b_t12_100M_UR50S.pt", "--msa-path", reference_seqs_file, "--msa-weights-folder", msa_weights, "--filter-msa", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+          proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--dms-input", df_target, "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", os.path.expanduser("~/esm_msa1b_t12_100M_UR50S.pt"), "--msa-path", reference_seqs_file, "--msa-weights-folder", msa_weights, "--filter-msa", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       else:
         outfile = None
 

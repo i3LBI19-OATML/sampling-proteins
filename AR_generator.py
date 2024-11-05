@@ -10,6 +10,8 @@ from AR_sampling import ARtop_k_sampling, ARtemperature_sampler, ARtop_p_samplin
 import time
 import AR_MCTS
 from EVmutation.model import CouplingsModel
+from tqdm.auto import tqdm
+import sys
 
 
 parser = argparse.ArgumentParser()
@@ -19,7 +21,7 @@ parser.add_argument('--Tmodel', type=str, help='Tranception model path')
 parser.add_argument('--use_scoring_mirror', action='store_true', help='Whether to score the sequence from both ends')
 parser.add_argument('--batch', type=int, default=20, help='Batch size for scoring')
 parser.add_argument('--max_pos', type=int, default=50, help='Maximum number of positions per heatmap')
-parser.add_argument('--num_workers', type=int, default=8, help='Number of workers for dataloader')
+parser.add_argument('--num_workers', type=int, default=2, help='Number of workers for dataloader')
 parser.add_argument('--with_heatmap', action='store_true', help='Whether to generate heatmap')
 parser.add_argument('--save_scores', action='store_true', help='Whether to save scores')
 
@@ -35,6 +37,7 @@ parser.add_argument('--max_length', type=int, help='Number of search levels in b
 parser.add_argument('--extension_factor', type=int, default=1, help='Number of AAs to add to extend the sequence in each round')
 parser.add_argument('--output_name', type=str, required=True, help='Output file name (Just name with no extension!)')
 parser.add_argument('--save_df', action='store_true', help='Whether to save the metadata dataframe')
+parser.add_argument('--verbose', type=int, default=0, help='Verbosity level')
 args = parser.parse_args()
 
 AA_vocab = "ACDEFGHIKLMNPQRSTVWY"
@@ -84,20 +87,22 @@ if args.sampling_method in ['top_k', 'top_p', 'typical', 'mirostat', 'beam_searc
 if args.sampling_method == 'beam_search' or args.sampling_method == 'mcts':
     assert args.max_length is not None, "Maximum length must be specified for beam_search or MCTS sampling method"
 
+pbar1 = tqdm(total=sequence_num, desc="Generating", position=0, leave=True)
 while len(generated_sequence) < sequence_num:
 
-    if not args.sequence:
-        seq = random.choice(AA_vocab)
-    else:
-        seq = args.sequence.upper()
+    if not args.sequence: seq = random.choice(AA_vocab)
+    else: seq = args.sequence.upper()
     sequence_length = len(seq)
     start_time = time.time()
     mutation_history = []
     iteration = 0
-
+    
+    pbar1.set_description(f"Generating {len(generated_sequence) + 1}/{sequence_num}")
     while sequence_length < seq_length:
-        print(f"Sequence {len(generated_sequence) + 1} of {sequence_num}, Length {sequence_length} of {seq_length}")
-        print("=========================================")
+        pbar1.set_postfix_str(f"Length: {sequence_length}/{seq_length}")
+        if args.verbose == 1:
+            print(f"Sequence {len(generated_sequence) + 1} of {sequence_num}, Length {sequence_length} of {seq_length}")
+            print("=========================================")
 
         if args.sampling_method == 'mcts':
             sampling_strat = args.sampling_method
@@ -122,7 +127,8 @@ while len(generated_sequence) < sequence_num:
                                                         tokenizer=tokenizer,
                                                         AR_mode=True,
                                                         Tranception_model=model,
-                                                        past_key_values=past_key_values)
+                                                        past_key_values=past_key_values,
+                                                        verbose=args.verbose)
 
             # Save scores
             if args.save_scores:
@@ -156,7 +162,7 @@ while len(generated_sequence) < sequence_num:
                 mutation = ARtop_k_sampling(scores, k=1, sampler=final_sampler)
             else:
                 raise ValueError(f"Sampling strategy {sampling_strat} not supported")
-            print(f"Using {sampling_strat} sampling strategy with threshold {sampling_threshold}")
+            print(f"Using {sampling_strat} sampling strategy with threshold {sampling_threshold}") if args.verbose == 1 else None
             # print("Sampled mutation: ", mutation)
 
         # 3. Get Mutated Sequence
@@ -166,10 +172,11 @@ while len(generated_sequence) < sequence_num:
             mutated_sequence = mutated_sequence[:seq_length]
         mutation_history += [mutated_sequence.replace(seq, '')]
 
-        print("Original Sequence: ", seq)
-        # print("Mutation: ", mutation)
-        print("Mutated Sequence: ", mutated_sequence)
-        print("=========================================")
+        if args.verbose == 1:
+            print("Original Sequence: ", seq)
+            # print("Mutation: ", mutation)
+            print("Mutated Sequence: ", mutated_sequence)
+            print("=========================================")
 
         seq = mutated_sequence
         sequence_length = len(seq)
@@ -187,9 +194,11 @@ while len(generated_sequence) < sequence_num:
     mutation_list.append(''.join(mutation_history))
     generation_time = time.time() - start_time
     generation_duration.append(generation_time)
-    print(f"Sequence {len(generated_sequence)} of {sequence_num} generated in {generation_time} seconds")
-    print("=========================================")
-    
+    pbar1.write(f"Sequence {len(generated_sequence)}/{sequence_num}: {generation_time} seconds")
+    # print("=========================================") if args.verbose == 1 else None
+    pbar1.update(1)
+
+pbar1.close()   
 print(f'===========Generated {len(generated_sequence)} sequences of length {seq_length} in {sum(generation_duration)} seconds============')
 generated_sequence_df = pd.DataFrame({'name': generated_sequence_name,'sequence': generated_sequence, 'sampling': samplings, 'threshold': samplingtheshold, 'subsampling':subsamplings, 'subthreshold': subsamplingtheshold, 'iterations': sequence_iteration, 'mutants': mutants, 'mutations': mutation_list, 'time': generation_duration})
 

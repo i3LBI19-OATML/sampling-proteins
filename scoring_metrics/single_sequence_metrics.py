@@ -43,6 +43,8 @@ def CARP_640m_logp(target_seqs_file, results, device):
 def ESM_1v(target_files, results, device, orig_seq): #TODO: allow other devices?
   if device=='cuda:0':
     torch.cuda.empty_cache()
+  if not os.path.isfile(os.path.expanduser("~/esm1v_t33_650M_UR90S_1.pt")):
+    subprocess.run(['wget', 'https://dl.fbaipublicfiles.com/fair-esm/models/esm1v_t33_650M_UR90S_1.pt', '-P', os.path.expanduser("~/")], check=True)
   with tempfile.TemporaryDirectory() as output_dir:
     outfile = output_dir + "/esm_results.csv"
     try:
@@ -66,7 +68,7 @@ def ESM_1v(target_files, results, device, orig_seq): #TODO: allow other devices?
           df_target = os.path.join(temp_dir, "target.csv")
 
           # print(f'ESM1v:')
-          proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--model_type", "ESM1v", "--dms-input", os.path.join(temp_dir, "target.csv"), "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", "/users/jerwan/esm1v_t33_650M_UR90S_1.pt", "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+          proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/esm/compute_fitness.py"), "--sequence", orig_seq, "--model_type", "ESM1v", "--dms-input", os.path.join(temp_dir, "target.csv"), "--dms-output", outfile, "--mutation-col", "mutant", "--model-location", os.path.expanduser("~/esm1v_t33_650M_UR90S_1.pt"), "--overwrite-prior-scores"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       else:
         outfile = None
     
@@ -117,6 +119,12 @@ def ESM_1v_unmask(targets_fasta, results, device, return_pred=False): #TODO: all
 def Progen2(target_files, results, device): #TODO: allow other devices?
   if device=='cuda:0':
     torch.cuda.empty_cache()
+  if not os.path.isdir(os.path.expanduser("~/progen2-base")):
+    subprocess.run(['wget', 'https://storage.googleapis.com/anon-progen-research/checkpoints/progen2-base.tar.gz', '-P', os.path.expanduser("~/")], check=True)
+    os.mkdir(os.path.expanduser("~/progen2-base"), exist_ok=True)
+    subprocess.run(['tar', '-xzf', os.path.expanduser("~/progen2-base.tar.gz"), '-C', os.path.expanduser("~/progen2-base")], check=True)
+    subprocess.run(['rm', os.path.expanduser("~/progen2-base.tar.gz")], check=True)
+
   with tempfile.TemporaryDirectory() as output_dir:
     outfile = output_dir + "/progen2_results.csv"
     try:      
@@ -130,7 +138,7 @@ def Progen2(target_files, results, device): #TODO: allow other devices?
         df_target.to_csv(os.path.join(temp_dir, "target.csv"), index=False)
         df_target = os.path.join(temp_dir, "target.csv")
 
-        proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/progen2/compute_fitness.py"), "--DMS_data_folder", os.path.join(temp_dir, "target.csv"), "--output_scores_folder", outfile, "--Progen2_model_name_or_path", "/users/jerwan/progen2-base", "--indel_mode"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = subprocess.run(['python', os.path.join(os.path.dirname(os.path.realpath(__file__)), "ProteinGym/proteingym/baselines/progen2/compute_fitness.py"), "--DMS_data_folder", os.path.join(temp_dir, "target.csv"), "--output_scores_folder", outfile, "--Progen2_model_name_or_path", os.path.expanduser("~/progen2-base"), "--indel_mode"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
     except subprocess.CalledProcessError as e:
       print(e.stderr.decode('utf-8'))

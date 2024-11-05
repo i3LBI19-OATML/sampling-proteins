@@ -12,6 +12,7 @@ from scoring_metrics import structure_metrics as st_metrics
 from scoring_metrics import single_sequence_metrics as ss_metrics
 from scoring_metrics import alignment_based_metrics as ab_metrics
 from scoring_metrics import fid_score as fid
+from scoring_metrics import esmfold
 import time
 
 #Reset calculated metrics (creates a new datastructure to store results, clearing any existing results)
@@ -21,12 +22,10 @@ start_time = time.time()
 # Default directories
 file_dir = os.path.dirname(os.path.realpath(__file__))
 default_pdb_dir = os.path.join(file_dir, "pdbs")
-default_reference_pdb_dir = os.path.join(file_dir, "reference_pdbs")
 default_reference_dir = os.path.join(file_dir, "reference_seqs")
 default_target_dir = os.path.join(file_dir, "target_seqs")
 
 os.makedirs(default_pdb_dir) if not os.path.exists(default_pdb_dir) else None
-os.makedirs(default_reference_pdb_dir) if not os.path.exists(default_reference_pdb_dir) else None
 os.makedirs(default_reference_dir) if not os.path.exists(default_reference_dir) else None
 os.makedirs(default_target_dir) if not os.path.exists(default_target_dir) else None
 
@@ -35,7 +34,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--pdb_dir", type=str, default=default_pdb_dir, help="Directory containing pdb files")
 parser.add_argument("--reference_dir", type=str, required=True, help="Directory containing reference fasta files")
 parser.add_argument("--msa_weights_dir", type=str, required=True, help="Directory containing MSA weights files (Obtain from ProteinGym repo)")
-parser.add_argument("--ref_pdb_dir", type=str, default=default_reference_pdb_dir, help="Directory containing reference pdb files")
+parser.add_argument("--reference_pdb", type=str, required=True, help="Reference pdb file")
 parser.add_argument("--target_dir", type=str, required=True, help="Directory containing target fasta files")
 parser.add_argument("--sub_matrix", type=str, choices=["blosum62", "pfasum15"], default="blosum62", help="Substitution matrix to use for alignment-based metrics")
 parser.add_argument("--remove_sub_score_mean", action="store_false", help="Whether to not score the mean of the scores for mutated sequences")
@@ -46,7 +45,7 @@ parser.add_argument("--remove_repeat_score_1", action="store_false", help="Wheth
 parser.add_argument("--remove_repeat_score_2", action="store_false", help="Whether to not score the second repeat")
 parser.add_argument("--remove_repeat_score_3", action="store_false", help="Whether to not score the third repeat")
 parser.add_argument("--remove_repeat_score_4", action="store_false", help="Whether to not score the fourth repeat")
-parser.add_argument("--score_structure", action="store_true", help="Whether to score structural metrics")
+parser.add_argument("--score_existing_structure", action="store_true", help="Whether to score existing pdb files")
 parser.add_argument("--use_tranception", action="store_true", help="Whether to use Tranception")
 parser.add_argument("--use_evmutation", action="store_true", help="Whether to use EVmutation")
 parser.add_argument("--skip_FID", action="store_true", help="Whether to not calculate FID")
@@ -54,8 +53,6 @@ parser.add_argument("--model_params", type=str, help="Model params to use for EV
 parser.add_argument("--orig_seq", required=True, type=str, help="Original sequence to use for Tranception or EVmutation")
 parser.add_argument('--output_name', type=str, required=True, help='Output file name (Just name with no extension!)')
 args = parser.parse_args()
-
-score_structure = args.score_structure
 
 # Checks
 if args.use_tranception or args.use_evmutation:
@@ -65,50 +62,42 @@ if args.use_evmutation:
   assert os.path.exists(args.model_params), f"Model params {args.model_params} does not exist"
 
 # Check that the required directories exist
-if score_structure:
-  pdb_dir = os.path.abspath(args.pdb_dir)
-  ref_pdb_dir = os.path.abspath(args.ref_pdb_dir)
+pdb_dir = os.path.abspath(args.pdb_dir) if args.score_existing_structure else None
+reference_pdb = os.path.abspath(args.reference_pdb)
 reference_dir = os.path.abspath(args.reference_dir)
 target_dir = os.path.abspath(args.target_dir)
 msa_weights_dir = os.path.abspath(args.msa_weights_dir)
 
-if score_structure:
-  assert os.path.exists(pdb_dir), f"PDB directory {pdb_dir} does not exist"
-  assert os.path.exists(ref_pdb_dir), f"Reference PDB directory {ref_pdb_dir} does not exist"
+if args.score_existing_structure: assert os.path.exists(pdb_dir), f"PDB directory {pdb_dir} does not exist" 
+assert os.path.isfile(reference_pdb), f"Reference pdb file {reference_pdb} does not exist"
 assert os.path.exists(reference_dir), f"Reference directory {reference_dir} does not exist"
 assert os.path.exists(target_dir), f"Target directory {target_dir} does not exist"
 assert os.path.exists(msa_weights_dir), f"MSA weights directory {msa_weights_dir} does not exist"
 
 # Check that the required files exist
-if score_structure:
-  pdb_files = glob(pdb_dir + "/*.pdb")
-  reference_pdb_files = glob(ref_pdb_dir + "/*.pdb")
+pdb_files = glob(pdb_dir + "/*.pdb") if args.score_existing_structure else None
 reference_files = glob(reference_dir + "/*.fasta")
 # msat_reference_files = glob(reference_dir + "/*.csv")
 target_files = glob(target_dir + "/*.fasta")
 msa_weights_files = glob(msa_weights_dir + "/*.npy")[0]
 
-if score_structure:
-  assert len(pdb_files) > 0, f"No pdb files found in {pdb_dir}"
-  assert len(reference_pdb_files) > 0, f"No reference pdb files found in {ref_pdb_dir}"
+if args.score_existing_structure: assert len(pdb_files) > 0, f"No pdb files found in {pdb_dir}"
 assert len(reference_files) > 0, f"No reference fasta files found in {reference_dir}"
 # assert len(msat_reference_files) > 0, f"No reference csv files (for MSAT) found in {reference_dir}"
 assert len(target_files) > 0, f"No target fasta files found in {target_dir}"
 assert len(msa_weights_files) > 0, f"No MSA weights files found in {msa_weights_dir}"
 
-if score_structure:
-# Structure metrics
-# ESM-IF, ProteinMPNN, MIF-ST, AlphaFold2 pLDDT, TM-score
-  if len(reference_pdb_files) > 1:
-    print("Found multiple reference pdb files, using the first one")
-    print(f"Found {len(reference_pdb_files)} reference pdb files, using {reference_pdb_files[0]}")
-  reference_pdb = reference_pdb_files[0]
-
+if args.score_existing_structure:
+  # Structure metrics
+  # ESM-IF, ProteinMPNN, MIF-ST, AlphaFold2 pLDDT, TM-score
   st_metrics.TM_score(pdb_files, reference_pdb, results)
   st_metrics.ESM_IF(pdb_files, results)
   st_metrics.ProteinMPNN(pdb_files, results)
   st_metrics.MIF_ST(pdb_files, results, device)
   st_metrics.AlphaFold2_pLDDT(pdb_files, results)
+else:
+  esmfold.predict_structure(target_dir, reference_pdb, save_dir=None, copies=1, num_recycles=3, keep_pdb=False, 
+                    verbose=0, collect_output=True, results=results)
 
 # Alignment-based metrics
 # ESM-MSA, Identity to closest reference, Subtitution matix (BLOSUM62 or PFASUM15) score mean of mutated positions
@@ -214,7 +203,7 @@ with tempfile.TemporaryDirectory() as output_dir:
 # os.remove(full_reference_seqs_file)
 # os.remove(target_seqs_file)
 
-if score_structure:
+if args.score_existing_structure:
   save_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "{}.csv".format(args.output_name))
 else :
   save_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "{}_no_structure.csv".format(args.output_name))

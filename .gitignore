@@ -32,3 +32,4 @@ masked-ar_protgen/*
 ar_protgen/*
 
 EVmutation/example/*
+scoring_metrics/esmfold.model

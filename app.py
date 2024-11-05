@@ -192,17 +192,6 @@ def score_and_create_matrix_all_singles(sequence, Tranception_model, mutation_ra
   if mutation_range_end is None: mutation_range_end=len(sequence)
   assert len(sequence) > 0, "no sequence entered"
   assert mutation_range_start <= mutation_range_end, "mutation range is invalid"
-  # try:
-  #   model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path=Tranception_model, local_files_only=True)
-  #   print("Model successfully loaded from local")
-  # except:
-  #   print("Model not found locally, downloading from HuggingFace")
-  #   if model_type=="Small":
-  #     model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Small")
-  #   elif model_type=="Medium":
-  #     model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Medium")
-  #   elif model_type=="Large":
-  #     model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Large")
   model = Tranception_model
   if torch.cuda.is_available():
     model.cuda()
@@ -237,44 +226,31 @@ def score_and_create_matrix_all_singles(sequence, Tranception_model, mutation_ra
       window_end = min(mutation_range_end,window_start+max_number_positions_per_heatmap-1)
   return score_heatmaps, suggest_mutations(scores), scores, all_single_mutants, past_key_values
 
-def score_multi_mutations(sequence:str, extra_mutants:pd.DataFrame, Tranception_model, mutation_range_start=None,mutation_range_end=None,scoring_mirror=False,batch_size_inference=20,max_number_positions_per_heatmap=50,num_workers=0,AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=False, past_key_values=None):
+def score_multi_mutations(sequence:str, extra_mutants:pd.DataFrame, Tranception_model, mutation_range_start=None,mutation_range_end=None,scoring_mirror=False,batch_size_inference=20,max_number_positions_per_heatmap=50,num_workers=0,AA_vocab=AA_vocab, tokenizer=tokenizer, AR_mode=False, past_key_values=None, verbose=0):
   if sequence is not None:
     if mutation_range_start is None: mutation_range_start=1
     if mutation_range_end is None: mutation_range_end=len(sequence)
   # assert len(sequence) > 0, "no sequence entered"
     assert mutation_range_start <= mutation_range_end, "mutation range is invalid"
-  # try:
-  #   model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path=Tranception_model, local_files_only=True)
-  #   print("Model successfully loaded from local")
-  # except:
-  #   print("Model not found locally, downloading from HuggingFace")
-  #   if model_type=="Small":
-  #     model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Small")
-  #   elif model_type=="Medium":
-  #     model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Medium")
-  #   elif model_type=="Large":
-  #     model = tranception.model_pytorch.TranceptionLMHeadModel.from_pretrained(pretrained_model_name_or_path="PascalNotin/Tranception_Large")
   model = Tranception_model
   # print(f'model: {model}')
   model.config.tokenizer = tokenizer
   if torch.cuda.is_available():
     model.cuda()
-    print("Inference will take place on GPU")
+    print("Inference will take place on GPU") if verbose == 1 else None
   else:
-    print("Inference will take place on CPU")
+    print("Inference will take place on CPU") if verbose == 1 else None
   scores, past_key_values = model.score_mutants(DMS_data=extra_mutants, 
                                     target_seq=sequence, 
                                     scoring_mirror=scoring_mirror, 
                                     batch_size_inference=batch_size_inference,  
                                     num_workers=num_workers, 
                                     indel_mode=False,
-                                    past_key_values=past_key_values
+                                    past_key_values=past_key_values,
+                                    verbose=verbose
                                     )
-  print("Scoring done")
+  print("Scoring done") if verbose == 1 else None
   scores = pd.merge(scores,extra_mutants,on="mutated_sequence",how="left")
-  # scores["position"]=scores["mutant"].map(lambda x: int(x[1:-1]))
-  # scores["target_AA"] = scores["mutant"].map(lambda x: x[-1])
-  # print(f'score col: {scores.columns}')
   if AR_mode:
     return scores, extra_mutants, past_key_values
   else:
@@ -289,18 +265,6 @@ def clear_inputs(protein_sequence_input,mutation_range_start,mutation_range_end)
   mutation_range_start = None
   mutation_range_end = None
   return protein_sequence_input,mutation_range_start,mutation_range_end, extra_mutants
-
-# def predict_proteinBERT(model, DMS, input_encoder, top_n, batch_size):
-#   seqs = DMS["mutated_sequence"]
-#   seq_len = 512
-
-#   X = input_encoder.encode_X(seqs, seq_len)
-#   y_pred = model.predict(X, batch_size = batch_size)
-
-#   DMS['prediction'] = y_pred
-#   DMS = DMS.sort_values(by = 'prediction', ascending = False, ignore_index = True)
-#   # DMS = DMS.head(top_n)
-#   return DMS.head(top_n)[['mutated_sequence', 'mutant']]
 
 def load_savedmodel(model_path):
   model = keras.models.load_model(model_path)
@@ -342,7 +306,6 @@ def get_all_possible_mutations_at_pos(sequence: str, position: int, or_mutant=No
       return pd.DataFrame(mutations)
 
 def get_attention_mutants(DMS, Tranception_model, focus='highest', top_n = 5, AA_vocab=AA_vocab, tokenizer=tokenizer):
-  # raise NotImplementedError
   os.environ["TOKENIZERS_PARALLELISM"] = "false"
   new_mutations = []
   for idx, row in tqdm.tqdm(DMS.iterrows(), total=len(DMS), desc=f'Getting attention mutants'):

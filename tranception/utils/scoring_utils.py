@@ -94,7 +94,7 @@ def get_tranception_scores_mutated_sequences(model, mutated_sequence_df, batch_s
         sampler = SequentialSampler(ds)
         ds_loader = torch.utils.data.DataLoader(ds, batch_size=batch_size_inference, sampler=sampler, collate_fn=data_collator, num_workers=num_workers, pin_memory=True, drop_last=False)
         mutant_index=0
-        for encoded_batch in tqdm.tqdm(ds_loader):
+        for encoded_batch in tqdm.tqdm(ds_loader, disable=True):
             full_batch_length = len(encoded_batch['input_ids'])
             mutated_sequence = np.array(mutated_sequence_df['mutated_sequence'][mutant_index:mutant_index+full_batch_length])
             scores['mutated_sequence'] += list(mutated_sequence)

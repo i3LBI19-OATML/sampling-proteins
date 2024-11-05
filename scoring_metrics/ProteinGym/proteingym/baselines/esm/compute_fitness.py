@@ -10,6 +10,7 @@ from Bio import SeqIO
 import itertools
 from typing import List, Tuple
 import torch
+import subprocess
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from baselines.esm import esm
@@ -18,6 +19,12 @@ from esm import Alphabet, FastaBatchedDataset, ProteinBertModel, pretrained, MSA
 from utils.scoring_utils import get_optimal_window, set_mutant_offset, undo_mutant_offset
 from utils.data_utils import DMS_file_cleanup
 from utils.msa_utils import MSA_processing
+
+if not os.path.isdir(os.path.expanduser('~/hh-suite-3.3.0')):
+    subprocess.run(['wget', 'https://github.com/soedinglab/hh-suite/releases/download/v3.3.0/hhsuite-3.3.0-AVX2-Linux.tar.gz', '-P', os.path.expanduser('~/')], check=True)
+    os.mkdir(os.path.expanduser('~/hh-suite-3.3.0'), exist_ok=True)
+    subprocess.run(['tar', '-xzf', os.path.expanduser('~/hhsuite-3.3.0-AVX2-Linux.tar.gz'), '-C', os.path.expanduser('~/hh-suite-3.3.0')], check=True)
+    subprocess.run(['rm', os.path.expanduser('~/hhsuite-3.3.0-AVX2-Linux.tar.gz')], check=True)
 
 def standardization(x):
     """Assumes input is numpy array or pandas series"""

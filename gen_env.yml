@@ -6,6 +6,7 @@ channels:
 dependencies:
   - python=3.8
   - pip
+  - pandas=2.0.2
   - cudatoolkit~=11.7
   - cudnn~=8.4.1
   - seaborn~=0.11.2
@@ -23,6 +24,5 @@ dependencies:
   - importlib_metadata
   - safetensors
   - huggingface_hub
-  - pip:
-      # - -e ./protein_bert/
-      - pandas==2.0.2
+  - numpy=1.22.3
+  - tensorflow
