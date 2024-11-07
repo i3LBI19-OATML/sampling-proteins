@@ -87,6 +87,7 @@ assert len(reference_files) > 0, f"No reference fasta files found in {reference_
 assert len(target_files) > 0, f"No target fasta files found in {target_dir}"
 assert len(msa_weights_files) > 0, f"No MSA weights files found in {msa_weights_dir}"
 
+structure_time = time.time()
 if args.score_existing_structure:
   # Structure metrics
   # ESM-IF, ProteinMPNN, MIF-ST, AlphaFold2 pLDDT, TM-score
@@ -98,6 +99,7 @@ if args.score_existing_structure:
 else:
   esmfold.predict_structure(target_dir, reference_pdb, save_dir=None, copies=1, num_recycles=3, keep_pdb=False, 
                     verbose=0, collect_output=True, results=results)
+print(f"############ STRUCTURE METRICS DONE! ({time.time() - structure_time}s) ############")
 
 # Alignment-based metrics
 # ESM-MSA, Identity to closest reference, Subtitution matix (BLOSUM62 or PFASUM15) score mean of mutated positions
@@ -161,7 +163,7 @@ with tempfile.TemporaryDirectory() as output_dir:
                                 results=results,
                                 gap_open=sub_gap_open,
                                 gap_extend=sub_gap_extend,)
-  print(f"Alignment-based metrics took {time.time() - alignment_time} seconds")
+  print(f"############ ALIGNMENT-BASED METRICS DONE! ({time.time() - alignment_time}s) ############")
 
   if args.use_evmutation:
     ab_metrics.EVmutation(target_files=target_files, orig_seq=args.orig_seq.upper(), results=results, model_params=args.model_params)
@@ -185,7 +187,7 @@ with tempfile.TemporaryDirectory() as output_dir:
   if args.use_tranception:
     past_key_values = None
     past_key_values = ss_metrics.Tranception(target_files=target_files, orig_seq=args.orig_seq.upper(), results=results, device=device, model_type="Large", local_model=os.path.expanduser("~/Tranception_Large"))
-  print(f"Single sequence metrics took {time.time() - single_time} seconds")
+  print(f"############ SINGLE SEQUENCE METRICS DONE! ({time.time() - single_time}s) ############")
 
   # Download results
   df = pd.DataFrame.from_dict(results, orient="index")
@@ -212,7 +214,6 @@ os.makedirs(os.path.dirname(os.path.realpath(save_path))) if not os.path.exists(
 df.to_csv(save_path)
 
 print("===========================================")
-print(f"Results saved to {save_path}")
-print(f"Time taken: {time.time() - start_time} seconds")
+print(f"SCORING COMPLETED SUCCESSFULLY | SAVED: {save_path} | TIME: {time.time() - start_time} seconds")
 print("===========================================")
 
