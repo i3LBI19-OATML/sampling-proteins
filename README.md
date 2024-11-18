@@ -112,10 +112,39 @@ python  protein_scoring.py \
         --use_evmutation [flag to use EVmutation] \
         --orig_seq [string of original sequence] \
         --model_params [path to model params for EVmutation]
+```-->
+
+## Preparing EVmutation
+```bash
+EVmutation/plmc/bin/plmc -o [model output name].model_params \ 
+                         -c [model output name].txt \
+                         -f [name of target sequence (WT) from MSA file, before forwardslash (/)] \
+                         -le [0.2*(N-1), N is length of target sequence] \
+                         -lh 0.01 \
+                         -m 200 \
+                         -t 0.2 \
+                         -g [MSA file (.a2m format)]
+```
+*MSA files downloadable from [here](https://github.com/OATML-Markslab/Tranception/tree/main?tab=readme-ov-file#multiple-sequence-alignments-msas)
+
+## Reference
+If you use this repository in your work, please cite the following paper:
+```
+Darmawan, J. T., Gal, Y., & Notin, P. (2023). Sampling protein language models for functional protein design. In NeurIPS 2023 Generative AI and Biology (GenBio) Workshop.
 ```
 
-Example for avGFP:
+### BibTeX
+```bibtex
+@inproceedings{
+darmawan2023sampling,
+title={Sampling Protein Language Models for Functional Protein Design},
+author={Jeremie Theddy Darmawan and Yarin Gal and Pascal Notin},
+booktitle={NeurIPS 2023 Generative AI and Biology (GenBio) Workshop},
+year={2023},
+url={https://openreview.net/forum?id=JPOW9FToYX}
+}
 ```
-EVmutation/plmc/bin/plmc -o EVmutation/example/avGFP.model_params -c EVmutation/example/avGFP.txt -f TARGET -le 47.4 -lh 0.01 -m 200 -t 0.2 -g EVmutation/example/avGFP.a2m
 
-``` -->
+## Links
+- NeurIPS 2023 GenBio proceedings: https://openreview.net/pdf?id=JPOW9FToYX
+- NeurIPS 2023 MLSB proceedings: https://www.mlsb.io/papers_2023/Sampling_Protein_Language_Models_for_Functional_Protein_Design.pdf
