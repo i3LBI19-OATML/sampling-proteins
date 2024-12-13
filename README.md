@@ -6,13 +6,14 @@ Consists of 2 parts:
 
 ## Protein Generation
 
-Generation Steps:
+Generation Steps[^3]:
 1. Score possible mutated/extended sequence using Tranception
 2. Generate mutations key
 3. Sample mutations/extension
 4. Mutate/extend original sequence with key
 5. Repeat (1-4) until desired parameters
-*Mutate for MLDE and extend for AR
+
+[^3]: Mutate for MLDE and extend for AR
 
 ## Mutation/Extension with PLM
 Might be transferable to any PLM
