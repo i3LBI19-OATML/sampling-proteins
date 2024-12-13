@@ -15,7 +15,7 @@ Generation Steps[^3]:
 
 [^3]: Mutate for MLDE and extend for AR
 
-## Mutation/Extension with PLM
+### Mutation/Extension with PLM
 Might be transferable to any PLM
 
 | Files | Description |
@@ -24,7 +24,7 @@ Might be transferable to any PLM
 | `multi-generator.py` | IRS-doubles |
 | `AR_generator.py` | ARS-singles & ARS-doubles|
 
-## Leveraging `.generate()` from HuggingFace
+### Leveraging `.generate()` from HuggingFace
 Transferable to other autoregressive HuggingFace model. Generates from left to right direction.
 
 | Files | Description |
